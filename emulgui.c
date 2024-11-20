@@ -33,32 +33,101 @@ void reset() {
 
 //Main emulation loop analyse and execute cyclecount instructions
 void mloop() {
-  unsigned short ir,op,dest,src1,src2,n;
+  unsigned short ir,n;
   unsigned int temp1;
   signed int temp2;
 
-  static void* labels[] = {&&dolod, &&doadd, &&dosub, &&doand,
+  static void* labels[] = {
+    &&dolod, &&doadd, &&dosub, &&doand,
     &&doora, &&doxor, &&doshr, &&domul,
     &&dosto, &&domif, &&dogtu, &&dogts,
-    &&doltu, &&dolts, &&doequ, &&domaj};
+    &&doltu, &&dolts, &&doequ, &&domaj
+  };
 
-dolod:                                                   // LOD Rd,Rs1,Rs2
+dolod:
   regs[15]++;
 
   if (regs[current->src2]<0xFFF0) {                     // For memory area belonging to ROM or RAM
     regs[current->dest]=memory[regs[current->src2]];   // Put to destination register 16 bit value pointed by SRC1
-  }
-  else 
-  if (regs[current->src2]==0xFFF1) {                    // If memory belongs to I/O map, for each device
+  } else if (regs[current->src2]==0xFFF1) {             // If memory belongs to I/O map, for each device
     regs[current->dest]=asciikeyboard;                 // Do special handling
     asciikeyboard=0;                                   // This keyboard controller returns ASCII code of the key!
   }
-  if (src2==15 && dest !=15)                            // If addressed by program counter skip the extra word
+  if (current->src2==15 && current->dest !=15)                            // If addressed by program counter skip the extra word
     regs[15]++;
 
   current = instrmem + regs[15];
   goto *(current->execaddr);
+doadd:
+  regs[15]++;
 
+  regs[current->dest]=regs[current->src1]+regs[current->src2];       // Perform addition
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+dosub:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1]-regs[current->src2];       // Perform subtraction
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+doand:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1]&regs[current->src2];       // Perform logical AND
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+doora:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1]|regs[current->src2];       // Perform logical OR
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+doxor:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1]^regs[current->src2];       // Perform logical XOR
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+doshr:
+  regs[15]++;
+
+  n=regs[current->src2] & 0xF;                     // Extract shift count from bits at position 0-3
+  switch((regs[current->src2] & 0x0030) >> 4)      // Extract shift kind from bits at position 4-5
+  {
+
+    case 0:
+      temp2=regs[current->src1];              // Arithmetic shift right preserve highest (sign) bit
+      if (regs[current->src1]>=0x8000)        // For negative number
+        temp2 |= 0xFFFF0000;        // Set internal 32 bit number to all high 16 bits = 1
+      regs[current->dest] = temp2 >> (n);     // Then shift n times right
+      break;
+    case 1:
+      temp1=regs[current->src1];              // Logical shift right pushes with zero
+      regs[current->dest] = temp1 >> (n);     // Then shift n times right
+      break;
+    case 2: 
+      regs[current->dest] = regs[current->src1] << n;  // Shift left
+      break;
+    case 3:
+      regs[current->dest] = (regs[current->src1] << n) | 
+        (regs[current->src1] >> (16 - n));    // Rotate right is clumsy in C, combination of left and right shift
+      break;
+  }
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+domul:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1]*regs[current->src2];        // put lower 16 bits of the result into destination
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
 dosto:
   regs[15]++;
 
@@ -67,12 +136,13 @@ dosto:
       memory[regs[current->src2]]=                // and memory pointed by SRC2 register 
       regs[current->src1];
 
-    ir=memory[regs[current->src1]];    
+    ir=memory[regs[current->src2]];    
     accessed=instrmem+regs[current->src2];
     accessed->execaddr=labels[(ir & 0xF000)>>12]; // 4 bits for opcode
     accessed->dest=(ir & 0x0F00)>>8;              // 4 bits for destination
     accessed->src1=(ir & 0x00F0)>>4;              // 4 bits for src1
     accessed->src2=(ir & 0x000F);                 // 4 bits for src2
+
     if (regs[current->src2]>=0xB000 &&               // Special case for memory belonging to video
       regs[current->src2]<0xFB00 ) {
       int pos=(regs[current->src2]-0xB000)*16;      // 16 pixels per word, convert to relative position in bitmap
@@ -95,167 +165,81 @@ dosto:
       *(pBits+pos+15)=(val & 0x0001)?1:0;
       videochanged=1;                     // Video was changed
     }           
-  }
-  else {                                    // Area of memory that belongs to ROM or unidirectional I/O device
+  } else {                                    // Area of memory that belongs to ROM or unidirectional I/O device
     regs[current->dest]=regs[current->src1];               // Do not update memory, just destination register
   }
   if (current->src2==15)                           // If addressed by program counter skip the extra word
     regs[15]++;
-  break;
 
   current = instrmem + regs[15];
   goto *(current->execaddr);
+domif:
+  regs[15]++;
 
-  do {
-    ir=memory[regs[15]];                          // Get instruction from address pointed by program counter
+  regs[current->dest]=regs[current->src1]?regs[current->src2]:regs[current->dest];
 
-    //     printf("Executing %4x: %4x R0=%4x R1=%4x R2=%4x R3=%4x R4=%4x R5=%4x R6=%4x  R7=%4x  R8=%4x  R13=%4x\n",
-    //        regs[15],ir,regs[0],regs[1],regs[2],regs[3],regs[4],regs[5],regs[6],regs[7], regs[8], regs[13]  );
-    op=(ir & 0xF000)>>12;                         // 4 bits for opcode
-    dest=(ir & 0x0F00)>>8;                        // 4 bits for destination
-    src1=(ir & 0x00F0)>>4;                        // 4 bits for src1
-    src2=(ir & 0x000F);                           // 4 bits for src2
-    regs[15]++;                                   // Program counter before execution will point to next instruction
-    switch (op) {
-      case 0x0:                                  // LOD Rd,Rs1,Rs2
-        if (regs[src2]<0xFFF0) {                // For memory area belonging to ROM or RAM
-          regs[dest]=memory[regs[src2]];        // Put to destination register 16 bit value pointed by SRC1
-        }
-        else 
-        if (regs[src2]==0xFFF1) {               // If memory belongs to I/O map, for each device
-          regs[dest]=asciikeyboard;             // Do special handling
-          asciikeyboard=0;                      // This keyboard controller returns ASCII code of the key!
-        }
-        if (src2==15 && dest !=15)              // If addressed by program counter skip the extra word
-          regs[15]++;
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+dogtu:
+  regs[15]++;
 
-        break;
-      case 0x1:                                  // ADD Rd,Rs1,Rs2
-        regs[dest]=regs[src1]+regs[src2];       // Perform addition
-        break;
-      case 0x2:                                  // SUB Rd,Rs1,Rs2
-        regs[dest]=regs[src1]-regs[src2];       // Perform subtraction
-        break;
-      case 0x3:                                  // AND Rd,Rs1,Rs2
-        regs[dest]=regs[src1]&regs[src2];       // Perform logical AND
-        break;
-      case 0x4:                                  // ORA Rd,Rs1,Rs2
-        regs[dest]=regs[src1]|regs[src2];       // Perform logical OR
-        break;
-      case 0x5:                                  // XOR Rd,Rs1,Rs2
-        regs[dest]=regs[src1]^regs[src2];       // Perform logical XOR
-        break;
-      case 0x6:                                  // SHR Rd,Rs1,Rs2
-        n=regs[src2] & 0xF;                     // Extract shift count from bits at position 0-3
-        switch((regs[src2] & 0x0030) >> 4)      // Extract shift kind from bits at position 4-5
-        {
+  regs[current->dest]=regs[current->src1]>regs[current->src2]  ? 1: 0;
 
-          case 0:
-            temp2=regs[src1];              // Arithmetic shift right preserve highest (sign) bit
-            if (regs[src1]>=0x8000)        // For negative number
-              temp2 |= 0xFFFF0000;        // Set internal 32 bit number to all high 16 bits = 1
-            regs[dest] = temp2 >> (n);     // Then shift n times right
-            break;
-          case 1:
-            temp1=regs[src1];              // Logical shift right pushes with zero
-            regs[dest] = temp1 >> (n);     // Then shift n times right
-            break;
-          case 2: 
-            regs[dest] = regs[src1] << n;  // Shift left
-            break;
-          case 3:
-            regs[dest] = (regs[src1] << n) | 
-              (regs[src1] >> (16 - n));    // Rotate right is clumsy in C, combination of left and right shift
-            break;
-        }
-        break;
-      case 0x7:                                   // MUL Rd,Rs1,Rs2
-        regs[dest]=regs[src1]*regs[src2];        // put lower 16 bits of the result into destination
-        break;
-      case 0x8:                                            // STO Rd,Rs1,Rs2  - stores Rs1 both to Rd and address pointed by Rs2                                    
-        if (regs[current->src2]<0xFFF0) {                 // Area of memory that belongs to RAM 
-          regs[current->dest]=                           // Store value both to destination register
-            memory[regs[current->src2]]=                // and memory pointed by SRC2 register 
-            regs[current->src1];
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+dogts:
+  regs[15]++;
 
-          ir=memory[regs[current->src1]];    
-          accessed=instrmem+regs[current->src2];
-          accessed->execaddr=labels[(ir & 0xF000)>>12]; // 4 bits for opcode
-          accessed->dest=(ir & 0x0F00)>>8;              // 4 bits for destination
-          accessed->src1=(ir & 0x00F0)>>4;              // 4 bits for src1
-          accessed->src2=(ir & 0x000F);                 // 4 bits for src2
-          if (regs[current->src2]>=0xB000 &&               // Special case for memory belonging to video
-            regs[current->src2]<0xFB00 ) {
-            int pos=(regs[current->src2]-0xB000)*16;      // 16 pixels per word, convert to relative position in bitmap
-            unsigned short val=regs[current->src1];
-            *(pBits+pos)  = (val & 0x8000)?1:0;           // Now for each bit in SRC1 register change corresponding byte in bitmap
-            *(pBits+pos+1)= (val & 0x4000)?1:0;
-            *(pBits+pos+2)= (val & 0x2000)?1:0;
-            *(pBits+pos+3)= (val & 0x1000)?1:0;
-            *(pBits+pos+4)= (val & 0x0800)?1:0;
-            *(pBits+pos+5)= (val & 0x0400)?1:0;
-            *(pBits+pos+6)= (val & 0x0200)?1:0;
-            *(pBits+pos+7)= (val & 0x0100)?1:0;
-            *(pBits+pos+8)= (val & 0x0080)?1:0;
-            *(pBits+pos+9)= (val & 0x0040)?1:0;
-            *(pBits+pos+10)=(val & 0x0020)?1:0;
-            *(pBits+pos+11)=(val & 0x0010)?1:0;
-            *(pBits+pos+12)=(val & 0x0008)?1:0;
-            *(pBits+pos+13)=(val & 0x0004)?1:0;
-            *(pBits+pos+14)=(val & 0x0002)?1:0;
-            *(pBits+pos+15)=(val & 0x0001)?1:0;
-            videochanged=1;                     // Video was changed
-          }           
-        }
-        else                                    // Area of memory that belongs to ROM or unidirectional I/O device
-      {
-          regs[dest]=regs[src1];               // Do not update memory, just destination register
-        }
-        if (src2==15)                           // If addressed by program counter skip the extra word
-          regs[15]++;
-        break;
-      case 0x9:                                  // MIF Rd,Rs1,Rs2  if Rs1 != 0 then Rd=Rs2
-        regs[dest]=regs[src1]?regs[src2]:regs[dest];
-        break;
-      case 0xA:                                  // GTU Rd,Rs1,Rs2  Greater than unsigned
-        regs[dest]=regs[src1]>regs[src2]  ? 1: 0;
-        break;
-      case 0xB:                                  // GTS Rd,Rs1,Rs2   Greater than signed
-        regs[dest]=(signed short) regs[src1]>(signed short) regs[src2]  ? 1: 0;
-        break;
-      case 0xC:                                  // LTU Rd,Rs1,Rs2   Less than unsigned 
-        regs[dest]=regs[src1]<regs[src2]  ? 1: 0;
-        break;
-      case 0xD:                                  // LTS Rd,Rs1,Rs2   Less than signed 
-        regs[dest]=(signed short) regs[src1]<(signed short) regs[src2]  ? 1: 0;
-        break;
-      case 0xE:                                  // EQU Rd,Rs1,Rs2   Equal
-        regs[dest]=regs[src1]==regs[src2]  ? 1: 0;
-        break;
-      case 0xF:                                  // MAJ Rd,Rs1,Rs2   Move and jump , if src1=R15, useful for subroutines
-        regs[dest]=regs[src1];                  // Put SRCq to dest
-        regs[15]=regs[src2];                    // Put SRC2 to program counter
-        break;
-    }
-    cyclecount -- ;                               // Reduce cycle count
-    //  } while (cyclecount>0);                          // Exit loop after several instructions
-  } ;
-                // Now we assume that MemoryDC is created and bitmap selected
-                void DisplayDIB(HDC hdc)
-                                {
-                                BitBlt( hdc,10, 10, 640, 480,                  // Now copy bitmap to window inside client area, 10 pixels from corner
-                                memDC, 0, 0, SRCCOPY );                      // From memory DC, whole bitmap, direct copy
-                                }
+  regs[current->dest]=(signed short) regs[current->src1]>(signed short) regs[current->src2]  ? 1: 0;
 
-                                DWORD WINAPI EmulateCPU(void* arg) {               // Thread function executed together with Windows main loop
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+doltu:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1]<regs[current->src2]  ? 1: 0;
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+dolts:
+  regs[15]++;
+
+  regs[current->dest]=(signed short) regs[current->src1]<(signed short) regs[current->src2]  ? 1: 0;
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+doequ:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1]==regs[current->src2]  ? 1: 0;
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+domaj:
+  regs[15]++;
+
+  regs[current->dest]=regs[current->src1];                  // Put SRCq to dest
+  regs[15]=regs[current->src2];                    // Put SRC2 to program counter
+
+  current = instrmem + regs[15]++;
+  goto *(current->execaddr);
+}
+
+// Now we assume that MemoryDC is created and bitmap selected
+void DisplayDIB(HDC hdc) {
+  BitBlt( hdc,10, 10, 640, 480,                  // Now copy bitmap to window inside client area, 10 pixels from corner
+         memDC, 0, 0, SRCCOPY );                      // From memory DC, whole bitmap, direct copy
+}
+
+DWORD WINAPI EmulateCPU(void* arg) {               // Thread function executed together with Windows main loop
 #define freq 10000000                              // Simulate 10 MHz machine
 #define LOWFREQ
-                                clock_t t1,t2,t3,delayadjust;
-                                int loopcount;
-                                double delay;
-                                loopcount=freq/10;                               // 10 frames per second
-                                delay=loopcount*(double)CLOCKS_PER_SEC/freq;     // Required time to additional wait floating point
-                                delayadjust=delay;                               // convert to integer
+  clock_t t1,t2,t3,delayadjust;
+  int loopcount;
+  double delay;
+  loopcount=freq/10;                               // 10 frames per second
+  delay=loopcount*(double)CLOCKS_PER_SEC/freq;     // Required time to additional wait floating point
+  delayadjust=delay;                               // convert to integer
 
   while(TRUE)                                      // Thread loop
   {
@@ -418,13 +402,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   fclose(prom);                                  // Close memory image
   reset();                                       // Reset the emulated CPU
 
-  // Popunit instrmem
-  for (int i = 0; i < 65536; i++) {
+  for (int i = 0; i < 65536; i++) {                         // Fill up instrmem
     unsigned short ir;
 
     ir = memory[i];
     accessed=instrmem+i;
-    accessed->execaddr=labels[(ir & 0xF000)>>12];                         // 4 bits for opcode
+    accessed->execaddr=labels[(ir & 0xF000)>>12];           // 4 bits for opcode
     accessed->dest=(ir & 0x0F00)>>8;                        // 4 bits for destination
     accessed->src1=(ir & 0x00F0)>>4;                        // 4 bits for src1
     accessed->src2=(ir & 0x000F);                           // 4 bits for src2
