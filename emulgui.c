@@ -2,6 +2,12 @@
 #include <stdio.h>
 #include <time.h>
 unsigned short memory [65536];                     // Array of 16 bit words simulates 128K memory
+struct instrukcije {
+   void * execaddr;
+   unsigned char dest;
+   unsigned char src1;
+   unsigned char src2;
+} instrmem[65536],*current,*accessed ;
 
 unsigned short regs [16];                          // Array of 16 bit words simulates 16 registers
 char asciikeyboard;                                // Variable that keeps ASCII code of the last pressed key
