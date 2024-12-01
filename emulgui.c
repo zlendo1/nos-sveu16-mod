@@ -1,6 +1,8 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
 #include <windows.h>
+
 unsigned short memory[65536]; // Array of 16 bit words simulates 128K memory
 
 struct instrukcije {
@@ -9,6 +11,7 @@ struct instrukcije {
   unsigned char src1;
   unsigned char src2;
 } instrmem[65536], *current, *accessed;
+bool regime_filling = true;
 
 unsigned short regs[16]; // Array of 16 bit words simulates 16 registers
 char asciikeyboard;      // Variable that keeps ASCII code of the last pressed key
@@ -39,7 +42,26 @@ void mloop() {
 
   static void *labels[] = {&&dolod, &&doadd, &&dosub, &&doand, &&doora, &&doxor, &&doshr, &&domul, &&dosto, &&domif, &&dogtu, &&dogts, &&doltu, &&dolts, &&doequ, &&domaj};
 
+  if (regime_filling) {
+    regime_filling = false;
+
+    for (int i = 0; i < 65536; i++) { // Fill up instrmem
+      unsigned short ir;
+
+      ir = memory[i];
+      accessed = instrmem + i;
+      accessed->execaddr = labels[(ir & 0xF000) >> 12]; // 4 bits for opcode
+      accessed->dest = (ir & 0x0F00) >> 8;              // 4 bits for destination
+      accessed->src1 = (ir & 0x00F0) >> 4;              // 4 bits for src1
+      accessed->src2 = (ir & 0x000F);                   // 4 bits for src2
+    }
+
+    return;
+  }
+
 dolod:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   if (regs[current->src2] < 0xFFF0) {                  // For memory area belonging to ROM or RAM
@@ -54,6 +76,8 @@ dolod:
   current = instrmem + regs[15];
   goto *(current->execaddr);
 doadd:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] + regs[current->src2]; // Perform addition
@@ -61,6 +85,8 @@ doadd:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 dosub:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] - regs[current->src2]; // Perform subtraction
@@ -68,6 +94,8 @@ dosub:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 doand:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] & regs[current->src2]; // Perform logical AND
@@ -75,6 +103,8 @@ doand:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 doora:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] | regs[current->src2]; // Perform logical OR
@@ -82,6 +112,8 @@ doora:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 doxor:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] ^ regs[current->src2]; // Perform logical XOR
@@ -89,6 +121,8 @@ doxor:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 doshr:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   n = regs[current->src2] & 0xF;               // Extract shift count from bits at position 0-3
@@ -116,6 +150,8 @@ doshr:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 domul:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] * regs[current->src2]; // put lower 16 bits of the result into destination
@@ -123,6 +159,8 @@ domul:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 dosto:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   if (regs[current->src2] < 0xFFF0) { // Area of memory that belongs to RAM
@@ -168,6 +206,8 @@ dosto:
   current = instrmem + regs[15];
   goto *(current->execaddr);
 domif:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] ? regs[current->src2] : regs[current->dest];
@@ -175,6 +215,8 @@ domif:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 dogtu:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] > regs[current->src2] ? 1 : 0;
@@ -182,6 +224,8 @@ dogtu:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 dogts:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = (signed short)regs[current->src1] > (signed short)regs[current->src2] ? 1 : 0;
@@ -189,6 +233,8 @@ dogts:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 doltu:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] < regs[current->src2] ? 1 : 0;
@@ -196,6 +242,8 @@ doltu:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 dolts:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = (signed short)regs[current->src1] < (signed short)regs[current->src2] ? 1 : 0;
@@ -203,6 +251,8 @@ dolts:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 doequ:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1] == regs[current->src2] ? 1 : 0;
@@ -210,6 +260,8 @@ doequ:
   current = instrmem + regs[15]++;
   goto *(current->execaddr);
 domaj:
+  if (cyclecount-- == 0)
+    return;
   regs[15]++;
 
   regs[current->dest] = regs[current->src1]; // Put SRCq to dest
@@ -372,9 +424,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   SetWindowPos(hwndMain, 0, xPos, yPos, 0, 0, SWP_NOZORDER | SWP_NOSIZE); // Center the window on the screen
   UpdateWindow(hwndMain);                                                 // Update and display the window
 
-  CreateDIB();                                                      // Create the DIB (Device-Independent Bitmap) for display simulated video memory
-  HANDLE thread = CreateThread(NULL, 0, EmulateCPU, NULL, 0, NULL); // Create a separate thread for CPU emulation
-  FILE *prom = fopen("forth.mem", "r");                             // Open a file with simulated RAM content
+  CreateDIB();                          // Create the DIB (Device-Independent Bitmap) for display simulated video memory
+  FILE *prom = fopen("forth.mem", "r"); // Open a file with simulated RAM content
   if (prom == NULL) {
     MessageBox(NULL, "Memory load fail!", "Error!",
                MB_ICONEXCLAMATION | MB_OK); // Display an error message if file not found
@@ -384,16 +435,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   fclose(prom);                    // Close memory image
   reset();                         // Reset the emulated CPU
 
-  for (int i = 0; i < 65536; i++) { // Fill up instrmem
-    unsigned short ir;
-
-    ir = memory[i];
-    accessed = instrmem + i;
-    accessed->execaddr = labels[(ir & 0xF000) >> 12]; // 4 bits for opcode
-    accessed->dest = (ir & 0x0F00) >> 8;              // 4 bits for destination
-    accessed->src1 = (ir & 0x00F0) >> 4;              // 4 bits for src1
-    accessed->src2 = (ir & 0x000F);                   // 4 bits for src2
-  }
+  mloop();                                                          // call for intstrmem filling
+  HANDLE thread = CreateThread(NULL, 0, EmulateCPU, NULL, 0, NULL); // Create a separate thread for CPU emulation
 
   /* Enter the message loop to process messages and input */
   while (GetMessage(&msg, NULL, 0, 0) > 0) { // If new message received...
