@@ -59,6 +59,9 @@ void mloop() {
     return;
   }
 
+  current = instrmem + regs[15];
+  goto *(current->execaddr);
+
 dolod:
   if (cyclecount-- == 0)
     return;
