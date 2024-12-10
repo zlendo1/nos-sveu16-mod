@@ -45,7 +45,7 @@ void mloop() {
   if (regime_filling) {
     regime_filling = false;
 
-    for (int i = 0; i < 65536; i++) { // Fill up instrmem
+    for (unsigned long i = 0; i < 65536; i++) { // Fill up instrmem
       unsigned short ir;
 
       ir = memory[i];
