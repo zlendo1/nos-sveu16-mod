@@ -85,7 +85,7 @@ doadd:
 
   regs[current->dest] = regs[current->src1] + regs[current->src2]; // Perform addition
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 dosub:
   if (cyclecount-- == 0)
@@ -94,7 +94,7 @@ dosub:
 
   regs[current->dest] = regs[current->src1] - regs[current->src2]; // Perform subtraction
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 doand:
   if (cyclecount-- == 0)
@@ -103,7 +103,7 @@ doand:
 
   regs[current->dest] = regs[current->src1] & regs[current->src2]; // Perform logical AND
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 doora:
   if (cyclecount-- == 0)
@@ -112,7 +112,7 @@ doora:
 
   regs[current->dest] = regs[current->src1] | regs[current->src2]; // Perform logical OR
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 doxor:
   if (cyclecount-- == 0)
@@ -121,7 +121,7 @@ doxor:
 
   regs[current->dest] = regs[current->src1] ^ regs[current->src2]; // Perform logical XOR
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 doshr:
   if (cyclecount-- == 0)
@@ -150,7 +150,7 @@ doshr:
     break;
   }
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 domul:
   if (cyclecount-- == 0)
@@ -159,7 +159,7 @@ domul:
 
   regs[current->dest] = regs[current->src1] * regs[current->src2]; // put lower 16 bits of the result into destination
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 dosto:
   if (cyclecount-- == 0)
@@ -215,7 +215,7 @@ domif:
 
   regs[current->dest] = regs[current->src1] ? regs[current->src2] : regs[current->dest];
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 dogtu:
   if (cyclecount-- == 0)
@@ -224,7 +224,7 @@ dogtu:
 
   regs[current->dest] = regs[current->src1] > regs[current->src2] ? 1 : 0;
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 dogts:
   if (cyclecount-- == 0)
@@ -233,7 +233,7 @@ dogts:
 
   regs[current->dest] = (signed short)regs[current->src1] > (signed short)regs[current->src2] ? 1 : 0;
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 doltu:
   if (cyclecount-- == 0)
@@ -242,7 +242,7 @@ doltu:
 
   regs[current->dest] = regs[current->src1] < regs[current->src2] ? 1 : 0;
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 dolts:
   if (cyclecount-- == 0)
@@ -251,7 +251,7 @@ dolts:
 
   regs[current->dest] = (signed short)regs[current->src1] < (signed short)regs[current->src2] ? 1 : 0;
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 doequ:
   if (cyclecount-- == 0)
@@ -260,7 +260,7 @@ doequ:
 
   regs[current->dest] = regs[current->src1] == regs[current->src2] ? 1 : 0;
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 domaj:
   if (cyclecount-- == 0)
@@ -270,7 +270,7 @@ domaj:
   regs[current->dest] = regs[current->src1]; // Put SRCq to dest
   regs[15] = regs[current->src2];            // Put SRC2 to program counter
 
-  current = instrmem + regs[15]++;
+  current = instrmem + regs[15];
   goto *(current->execaddr);
 }
 
