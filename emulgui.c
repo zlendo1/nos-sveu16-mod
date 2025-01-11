@@ -1,5 +1,8 @@
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <windows.h>
 
@@ -15,9 +18,9 @@ bool regime_filling = true;
 
 unsigned short regs[16]; // Array of 16 bit words simulates 16 registers
 char asciikeyboard;      // Variable that keeps ASCII code of the last pressed key
-int videochanged = 1;    // Indicates that video memory was changed and the bitmap needs to be redrawn
-long cyclecount;         // Counters of cycles per emulation frame
-struct BitMAPINFO        // Structure from Windows API
+int videochanged = 1; // Indicates that video memory was changed and the bitmap needs to be redrawn
+long cyclecount;      // Counters of cycles per emulation frame
+struct BitMAPINFO     // Structure from Windows API
 {
   BITMAPINFOHEADER bmiHeader;
   RGBQUAD bmiColors[256];
@@ -40,7 +43,8 @@ void mloop() {
   unsigned int temp1;
   signed int temp2;
 
-  static void *labels[] = {&&dolod, &&doadd, &&dosub, &&doand, &&doora, &&doxor, &&doshr, &&domul, &&dosto, &&domif, &&dogtu, &&dogts, &&doltu, &&dolts, &&doequ, &&domaj};
+  static void *labels[] = {&&dolod, &&doadd, &&dosub, &&doand, &&doora, &&doxor, &&doshr, &&domul,
+                           &&dosto, &&domif, &&dogtu, &&dogts, &&doltu, &&dolts, &&doequ, &&domaj};
 
   if (regime_filling) {
     regime_filling = false;
@@ -67,13 +71,15 @@ dolod:
     return;
   regs[15]++;
 
-  if (regs[current->src2] < 0xFFF0) {                  // For memory area belonging to ROM or RAM
-    regs[current->dest] = memory[regs[current->src2]]; // Put to destination register 16 bit value pointed by SRC1
-  } else if (regs[current->src2] == 0xFFF1) {          // If memory belongs to I/O map, for each device
-    regs[current->dest] = asciikeyboard;               // Do special handling
-    asciikeyboard = 0;                                 // This keyboard controller returns ASCII code of the key!
+  if (regs[current->src2] < 0xFFF0) { // For memory area belonging to ROM or RAM
+    regs[current->dest] =
+        memory[regs[current->src2]]; // Put to destination register 16 bit value pointed by SRC1
+  } else if (regs[current->src2] == 0xFFF1) { // If memory belongs to I/O map, for each device
+    regs[current->dest] = asciikeyboard;      // Do special handling
+    asciikeyboard = 0; // This keyboard controller returns ASCII code of the key!
   }
-  if (current->src2 == 15 && current->dest != 15) // If addressed by program counter skip the extra word
+  if (current->src2 == 15 &&
+      current->dest != 15) // If addressed by program counter skip the extra word
     regs[15]++;
 
   current = instrmem + regs[15];
@@ -146,7 +152,10 @@ doshr:
     regs[current->dest] = regs[current->src1] << n; // Shift left
     break;
   case 3:
-    regs[current->dest] = (regs[current->src1] << n) | (regs[current->src1] >> (16 - n)); // Rotate right is clumsy in C, combination of left and right shift
+    regs[current->dest] =
+        (regs[current->src1] << n) |
+        (regs[current->src1] >>
+         (16 - n)); // Rotate right is clumsy in C, combination of left and right shift
     break;
   }
 
@@ -157,7 +166,8 @@ domul:
     return;
   regs[15]++;
 
-  regs[current->dest] = regs[current->src1] * regs[current->src2]; // put lower 16 bits of the result into destination
+  regs[current->dest] =
+      regs[current->src1] * regs[current->src2]; // put lower 16 bits of the result into destination
 
   current = instrmem + regs[15];
   goto *(current->execaddr);
@@ -180,9 +190,13 @@ dosto:
 
     if (regs[current->src2] >= 0xB000 && // Special case for memory belonging to video
         regs[current->src2] < 0xFB00) {
-      int pos = (regs[current->src2] - 0xB000) * 16; // 16 pixels per word, convert to relative position in bitmap
+      int pos = (regs[current->src2] - 0xB000) *
+                16; // 16 pixels per word, convert to relative position in bitmap
       unsigned short val = regs[current->src1];
-      *(pBits + pos) = (val & 0x8000) ? 1 : 0; // Now for each bit in SRC1 register change corresponding byte in bitmap
+      *(pBits + pos) =
+          (val & 0x8000)
+              ? 1
+              : 0; // Now for each bit in SRC1 register change corresponding byte in bitmap
       *(pBits + pos + 1) = (val & 0x4000) ? 1 : 0;
       *(pBits + pos + 2) = (val & 0x2000) ? 1 : 0;
       *(pBits + pos + 3) = (val & 0x1000) ? 1 : 0;
@@ -200,7 +214,7 @@ dosto:
       *(pBits + pos + 15) = (val & 0x0001) ? 1 : 0;
       videochanged = 1; // Video was changed
     }
-  } else {                                     // Area of memory that belongs to ROM or unidirectional I/O device
+  } else { // Area of memory that belongs to ROM or unidirectional I/O device
     regs[current->dest] = regs[current->src1]; // Do not update memory, just destination register
   }
   if (current->src2 == 15) // If addressed by program counter skip the extra word
@@ -231,7 +245,8 @@ dogts:
     return;
   regs[15]++;
 
-  regs[current->dest] = (signed short)regs[current->src1] > (signed short)regs[current->src2] ? 1 : 0;
+  regs[current->dest] =
+      (signed short)regs[current->src1] > (signed short)regs[current->src2] ? 1 : 0;
 
   current = instrmem + regs[15];
   goto *(current->execaddr);
@@ -249,7 +264,8 @@ dolts:
     return;
   regs[15]++;
 
-  regs[current->dest] = (signed short)regs[current->src1] < (signed short)regs[current->src2] ? 1 : 0;
+  regs[current->dest] =
+      (signed short)regs[current->src1] < (signed short)regs[current->src2] ? 1 : 0;
 
   current = instrmem + regs[15];
   goto *(current->execaddr);
@@ -276,7 +292,8 @@ domaj:
 
 // Now we assume that MemoryDC is created and bitmap selected
 void DisplayDIB(HDC hdc) {
-  BitBlt(hdc, 10, 10, 640, 480, // Now copy bitmap to window inside client area, 10 pixels from corner
+  BitBlt(hdc, 10, 10, 640,
+         480, // Now copy bitmap to window inside client area, 10 pixels from corner
          memDC, 0, 0, SRCCOPY); // From memory DC, whole bitmap, direct copy
 }
 
@@ -286,9 +303,10 @@ DWORD WINAPI EmulateCPU(void *arg) { // Thread function executed together with W
   clock_t t1, t2, t3, delayadjust;
   int loopcount;
   double delay;
-  loopcount = freq / 10;                             // 10 frames per second
-  delay = loopcount * (double)CLOCKS_PER_SEC / freq; // Required time to additional wait floating point
-  delayadjust = delay;                               // convert to integer
+  loopcount = freq / 10; // 10 frames per second
+  delay =
+      loopcount * (double)CLOCKS_PER_SEC / freq; // Required time to additional wait floating point
+  delayadjust = delay;                           // convert to integer
 
   while (TRUE) // Thread loop
   {
@@ -314,17 +332,19 @@ DWORD WINAPI EmulateCPU(void *arg) { // Thread function executed together with W
 /* Called on exit */
 
 void DeallocateGDI() {
-  ReleaseDC(hwndMain, hdc); // The ReleaseDC function releases a device context (DC), freeing it for use by other applications.
+  ReleaseDC(hwndMain, hdc); // The ReleaseDC function releases a device context (DC), freeing it for
+                            // use by other applications.
   DeleteDC(memDC);          // The DeleteDC function deletes the specified device context (DC)
   free(pBits);              // Deallocate bitmap bits
-  DeleteObject(hBM);        // The DeleteObject function deletes a logical pen, brush, font, bitmap, region, or palette, freeing all system resources associated with the object.
+  DeleteObject(hBM);        // The DeleteObject function deletes a logical pen, brush, font, bitmap,
+                     // region, or palette, freeing all system resources associated with the object.
 }
 
 void CreateDIB() {
-  /* The CreateDIBSection function creates a device indenpendant bitmap that applications can write to directly.
-    The function gives you a pointer to the location of the bitmap bit values.
-      You can supply a handle to a file-mapping object that the function will use to create the bitmap,
-     or you can let the system allocate the memory for the bitmap.
+  /* The CreateDIBSection function creates a device indenpendant bitmap that applications can write
+    to directly. The function gives you a pointer to the location of the bitmap bit values. You can
+    supply a handle to a file-mapping object that the function will use to create the bitmap, or you
+    can let the system allocate the memory for the bitmap.
 */
   hdc = GetDC(hwndMain);
   int i;
@@ -351,7 +371,8 @@ void CreateDIB() {
                                   NULL,              // Do not use file mapping for DIB
                                   0);                // Offset in DIB not important
 
-  memDC = CreateCompatibleDC(hdc); // creates a memory device context (memDC) that is compatible with the
+  memDC = CreateCompatibleDC(
+      hdc); // creates a memory device context (memDC) that is compatible with the
   // device context (hdc) of the specified window (hwnd).
   // A device context is a data structure that defines the attributes of
   // drawing and painting operations. This memory device context is
@@ -400,10 +421,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   wc.lpfnWndProc = WndProc;       // This is where we will send messages to
   wc.hInstance = hInstance;       // Handle to process instance
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-  wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Set the background color of the window to a system color (COLOR_WINDOW)
-  wc.lpszClassName = "WindowClass";              // Set the name of the window class
-  wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);    // Load a standard icon for the window
-  wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);  // Set a small icon (if available) for the window
+  wc.hbrBackground =
+      (HBRUSH)(COLOR_WINDOW +
+               1); // Set the background color of the window to a system color (COLOR_WINDOW)
+  wc.lpszClassName = "WindowClass";             // Set the name of the window class
+  wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);   // Load a standard icon for the window
+  wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION); // Set a small icon (if available) for the window
 
   if (!RegisterClassEx(&wc)) // Register the window class with Windows
   {
@@ -412,7 +435,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     return 0;                               // Return 0 to indicate an error
   }
   hwndMain = CreateWindowEx( // Create the main application window
-      WS_EX_CLIENTEDGE, "WindowClass", "SVEU16 emulator", WS_VISIBLE | WS_OVERLAPPEDWINDOW, 0, 0, 680, 540, NULL, NULL, hInstance, NULL);
+      WS_EX_CLIENTEDGE, "WindowClass", "SVEU16 emulator", WS_VISIBLE | WS_OVERLAPPEDWINDOW, 0, 0,
+      680, 540, NULL, NULL, hInstance, NULL);
 
   if (hwndMain == NULL) {
     MessageBox(NULL, "Window Creation Failed!", "Error!",
@@ -421,13 +445,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   }
 
   RECT rc;
-  GetWindowRect(hwndMain, &rc);                                           // Rect contains rc current window rectangle in screen coordinates
-  int xPos = (GetSystemMetrics(SM_CXSCREEN) - rc.right) / 2;              // Half between screen width and right window edge
-  int yPos = (GetSystemMetrics(SM_CYSCREEN) - rc.bottom) / 2;             // Half between screen heighg and bottom window edge
-  SetWindowPos(hwndMain, 0, xPos, yPos, 0, 0, SWP_NOZORDER | SWP_NOSIZE); // Center the window on the screen
-  UpdateWindow(hwndMain);                                                 // Update and display the window
+  GetWindowRect(hwndMain, &rc); // Rect contains rc current window rectangle in screen coordinates
+  int xPos = (GetSystemMetrics(SM_CXSCREEN) - rc.right) /
+             2; // Half between screen width and right window edge
+  int yPos = (GetSystemMetrics(SM_CYSCREEN) - rc.bottom) /
+             2; // Half between screen heighg and bottom window edge
+  SetWindowPos(hwndMain, 0, xPos, yPos, 0, 0,
+               SWP_NOZORDER | SWP_NOSIZE); // Center the window on the screen
+  UpdateWindow(hwndMain);                  // Update and display the window
 
-  CreateDIB();                          // Create the DIB (Device-Independent Bitmap) for display simulated video memory
+  CreateDIB(); // Create the DIB (Device-Independent Bitmap) for display simulated video memory
   FILE *prom = fopen("forth.mem", "r"); // Open a file with simulated RAM content
   if (prom == NULL) {
     MessageBox(NULL, "Memory load fail!", "Error!",
@@ -438,8 +465,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   fclose(prom);                    // Close memory image
   reset();                         // Reset the emulated CPU
 
-  mloop();                                                          // call for intstrmem filling
-  HANDLE thread = CreateThread(NULL, 0, EmulateCPU, NULL, 0, NULL); // Create a separate thread for CPU emulation
+  mloop(); // call for intstrmem filling
+  HANDLE thread = CreateThread(NULL, 0, EmulateCPU, NULL, 0,
+                               NULL); // Create a separate thread for CPU emulation
 
   /* Enter the message loop to process messages and input */
   while (GetMessage(&msg, NULL, 0, 0) > 0) { // If new message received...
