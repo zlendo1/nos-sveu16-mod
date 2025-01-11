@@ -6,14 +6,28 @@
 #include <time.h>
 #include <windows.h>
 
-unsigned short memory[65536]; // Array of 16 bit words simulates 128K memory
+#define freq 8000000 // Simulate 8 MHz machine
+#define VRAM_START 0x2000
+#define VRAM_END 0x9D00
+#define VRAM_WIDTH 80
+#define VRAM_HEIGHT 25
+#define KEYBOARD_PORT 0xFFFF
+#define DISK_COMMAND_PORT 0xFFFE
+#define DISK_SECTOR_PORT 0xFFFD
+#define DISK_DATA_PORT 0xFFFC
+#define ROM_SIZE 1024
+#define DISK_SECTOR_SIZE 1024
+#define INTERRUPT_INTERVAL_MS 20
+#define MEM_SIZE 65536
+
+unsigned short memory[MEM_SIZE]; // Array of 16 bit words simulates 128K memory
 
 struct instrukcije {
   void *execaddr;
   unsigned char dest;
   unsigned char src1;
   unsigned char src2;
-} instrmem[65536], *current, *accessed;
+} instrmem[MEM_SIZE], *current, *accessed;
 bool regime_filling = true;
 
 unsigned short regs[16]; // Array of 16 bit words simulates 16 registers
@@ -49,7 +63,7 @@ void mloop() {
   if (regime_filling) {
     regime_filling = false;
 
-    for (unsigned long i = 0; i < 65536; i++) { // Fill up instrmem
+    for (unsigned long i = 0; i < MEM_SIZE; i++) { // Fill up instrmem
       unsigned short ir;
 
       ir = memory[i];
@@ -298,7 +312,6 @@ void DisplayDIB(HDC hdc) {
 }
 
 DWORD WINAPI EmulateCPU(void *arg) { // Thread function executed together with Windows main loop
-#define freq 8000000                 // Simulate 8 MHz machine
 #define LOWFREQ
   clock_t t1, t2, t3, delayadjust;
   int loopcount;
