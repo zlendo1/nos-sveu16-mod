@@ -298,7 +298,7 @@ void DisplayDIB(HDC hdc) {
 }
 
 DWORD WINAPI EmulateCPU(void *arg) { // Thread function executed together with Windows main loop
-#define freq 10000000                // Simulate 10 MHz machine
+#define freq 8000000                 // Simulate 8 MHz machine
 #define LOWFREQ
   clock_t t1, t2, t3, delayadjust;
   int loopcount;
