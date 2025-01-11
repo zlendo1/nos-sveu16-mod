@@ -8,9 +8,10 @@
 
 #define freq 8000000 // Simulate 8 MHz machine
 #define VRAM_START 0x2000
-#define VRAM_END 0x9D00
 #define VRAM_WIDTH 80
 #define VRAM_HEIGHT 25
+#define RAM_START 0x9D00
+#define IO_START 0xFFFC
 #define KEYBOARD_PORT 0xFFFF
 #define DISK_COMMAND_PORT 0xFFFE
 #define DISK_SECTOR_PORT 0xFFFD
@@ -88,7 +89,7 @@ dolod:
   if (regs[current->src2] < 0xFFF0) { // For memory area belonging to ROM or RAM
     regs[current->dest] =
         memory[regs[current->src2]]; // Put to destination register 16 bit value pointed by SRC1
-  } else if (regs[current->src2] == 0xFFF1) { // If memory belongs to I/O map, for each device
+  } else if (regs[current->src2] == 0xFFFF) { // If memory belongs to I/O map, for each device
     regs[current->dest] = asciikeyboard;      // Do special handling
     asciikeyboard = 0; // This keyboard controller returns ASCII code of the key!
   }
