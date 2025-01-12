@@ -18,8 +18,8 @@
 #define DISK_COMMAND_PORT 0xFFFE
 #define DISK_SECTOR_PORT 0xFFFD
 #define DISK_DATA_PORT 0xFFFC
-#define ROM_SIZE 1024
-#define DISK_SECTOR_SIZE 2048 // 256 B = 128 words = 2048 bits
+#define ROM_SIZE 256         // Coincidentally boot.img size in words
+#define DISK_SECTOR_SIZE 256 // 128 words
 #define INTERRUPT_INTERVAL_MS 20
 #define MEM_SIZE 65536
 #define DISK_PATH "disk.img"
@@ -117,7 +117,7 @@ dolod:
       MessageBox(NULL, "Error reading from disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     }
 
-    disk_position += sizeof(unsigned short);
+    disk_position += sizeof(unsigned short); // Move 2 bytes = 1 word
 
     if (disk_position == DISK_SECTOR_SIZE) {
       fclose(file_handler);
@@ -288,7 +288,7 @@ dosto:
       regs[current->dest] = regs[current->src1];
     }
 
-    disk_position += sizeof(unsigned short);
+    disk_position += sizeof(unsigned short); // Move 2 bytes = 1 word
 
     if (disk_position == DISK_SECTOR_SIZE) {
       fclose(file_handler);
@@ -373,14 +373,14 @@ domaj:
 }
 
 void bootstrap(const char *boot_img) {
-  FILE *prom = fopen(boot_img, "r");
+  FILE *prom = fopen(boot_img, "rb");
 
   if (prom == NULL) {
     MessageBox(NULL, "Memory load fail!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     exit(EXIT_FAILURE);
   }
 
-  fread(memory + ROM_START, 1, RAM_START - ROM_START, prom); // Load ROM
+  fread(memory + ROM_START, sizeof(unsigned short), ROM_SIZE, prom); // Load ROM
 
   fclose(prom);
 }
@@ -548,18 +548,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                SWP_NOZORDER | SWP_NOSIZE); // Center the window on the screen
   UpdateWindow(hwndMain);                  // Update and display the window
 
+  CreateDIB(); // Create the DIB (Device-Independent Bitmap) for display simulated video memory
+
   bootstrap("boot.img");
 
-  CreateDIB(); // Create the DIB (Device-Independent Bitmap) for display simulated video memory
-  FILE *prom = fopen("forth.mem", "r"); // Open a file with simulated RAM content
-  if (prom == NULL) {
-    MessageBox(NULL, "Memory load fail!", "Error!",
-               MB_ICONEXCLAMATION | MB_OK); // Display an error message if file not found
-    return 0;                               // Return 0 to indicate an error
-  }
-  fread(memory, 1, 0x20000, prom); // Read content
-  fclose(prom);                    // Close memory image
-  reset();                         // Reset the emulated CPU
+  /*FILE *prom = fopen("forth.mem", "r"); // Open a file with simulated RAM content*/
+  /*if (prom == NULL) {*/
+  /*  MessageBox(NULL, "Memory load fail!", "Error!",*/
+  /*             MB_ICONEXCLAMATION | MB_OK); // Display an error message if file not found*/
+  /*  return 0;                               // Return 0 to indicate an error*/
+  /*}*/
+  /*fread(memory, 1, 0x20000, prom); // Read content*/
+  /*fclose(prom);                    // Close memory image*/
+
+  reset(); // Reset the emulated CPU
 
   mloop(); // call for intstrmem filling
   HANDLE thread = CreateThread(NULL, 0, EmulateCPU, NULL, 0,
