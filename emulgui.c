@@ -11,8 +11,8 @@
 #define VRAM_START 0x2000
 #define VRAM_WIDTH 80
 #define VRAM_HEIGHT 25
-#define RAM_START 0x9D00
-#define IO_START 0xFFFC
+#define RAM_START 0x6B00 // Working with old VRAM width, new will be 0x9B00
+#define IO_START 0xFFF0
 #define KEYBOARD_PORT 0xFFFF
 #define DISK_COMMAND_PORT 0xFFFE
 #define DISK_SECTOR_PORT 0xFFFD
@@ -87,12 +87,13 @@ dolod:
     return;
   regs[15]++;
 
-  if (regs[current->src2] < 0xFFF0) { // For memory area belonging to ROM or RAM
+  if (regs[current->src2] < IO_START) { // For memory area belonging to ROM or RAM
     regs[current->dest] =
         memory[regs[current->src2]]; // Put to destination register 16 bit value pointed by SRC1
-  } else if (regs[current->src2] == 0xFFFF) { // If memory belongs to I/O map, for each device
-    regs[current->dest] = asciikeyboard;      // Do special handling
-    asciikeyboard = 0; // This keyboard controller returns ASCII code of the key!
+  } else if (regs[current->src2] ==
+             KEYBOARD_PORT) {            // If memory belongs to I/O map, for each device
+    regs[current->dest] = asciikeyboard; // Do special handling
+    asciikeyboard = 0;                   // This keyboard controller returns ASCII code of the key!
   }
   if (current->src2 == 15 &&
       current->dest != 15) // If addressed by program counter skip the extra word
@@ -192,9 +193,9 @@ dosto:
     return;
   regs[15]++;
 
-  if (regs[current->src2] < 0xFFF0) { // Area of memory that belongs to RAM
-    regs[current->dest] =             // Store value both to destination register
-        memory[regs[current->src2]] = // and memory pointed by SRC2 register
+  if (regs[current->src2] < IO_START) { // Area of memory that belongs to RAM
+    regs[current->dest] =               // Store value both to destination register
+        memory[regs[current->src2]] =   // and memory pointed by SRC2 register
         regs[current->src1];
 
     ir = memory[regs[current->src2]];
