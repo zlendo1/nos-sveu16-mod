@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #define freq 8000000 // Simulate 8 MHz machine
+#define ROM_START 0x0
 #define VRAM_START 0x2000
 #define VRAM_WIDTH 80
 #define VRAM_HEIGHT 25
