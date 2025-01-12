@@ -8,19 +8,21 @@
 
 #define freq 8000000 // Simulate 8 MHz machine
 #define ROM_START 0x0
+#define RAM_START 0x0100
 #define VRAM_START 0x2000
+#define VRAM_END 0x24B0 // VRAM + (VRAM_WIDTH + VRAM_HEIGHT)
 #define VRAM_WIDTH 80
 #define VRAM_HEIGHT 25
-#define RAM_START 0x6B00 // Working with old VRAM width, new will be 0x9B00
 #define IO_START 0xFFF0
 #define KEYBOARD_PORT 0xFFFF
 #define DISK_COMMAND_PORT 0xFFFE
 #define DISK_SECTOR_PORT 0xFFFD
 #define DISK_DATA_PORT 0xFFFC
 #define ROM_SIZE 1024
-#define DISK_SECTOR_SIZE 1024
+#define DISK_SECTOR_SIZE 2048 // 256 B = 128 words = 2048 bits
 #define INTERRUPT_INTERVAL_MS 20
 #define MEM_SIZE 65536
+#define DISK_PATH "disk.img"
 
 unsigned short memory[MEM_SIZE]; // Array of 16 bit words simulates 128K memory
 
@@ -36,18 +38,26 @@ unsigned short regs[16]; // Array of 16 bit words simulates 16 registers
 char asciikeyboard;      // Variable that keeps ASCII code of the last pressed key
 int videochanged = 1; // Indicates that video memory was changed and the bitmap needs to be redrawn
 long cyclecount;      // Counters of cycles per emulation frame
-struct BitMAPINFO     // Structure from Windows API
+
+struct BitMAPINFO // Structure from Windows API
 {
   BITMAPINFOHEADER bmiHeader;
   RGBQUAD bmiColors[256];
 };
 struct BitMAPINFO bi; // Define Bitmap
-BYTE *pBits;          // Pointer to bitmap memory
-HDC memDC;            // Memory device context
+
+BYTE *pBits; // Pointer to bitmap memory
+HDC memDC;   // Memory device context
 HBITMAP hBM;
 HINSTANCE hinst;
 HWND hwndMain;
 HDC hdc;
+
+unsigned short disk_command;
+unsigned short disk_sector;
+unsigned short disk_position;
+FILE *file_handler = NULL;
+
 // CPU initialization
 void reset() {
   regs[15] = 0; // Just set program counter to zero
@@ -94,7 +104,29 @@ dolod:
              KEYBOARD_PORT) {            // If memory belongs to I/O map, for each device
     regs[current->dest] = asciikeyboard; // Do special handling
     asciikeyboard = 0;                   // This keyboard controller returns ASCII code of the key!
+  } else if (regs[current->src2] == DISK_DATA_PORT) {
+    if (disk_command == 1 && disk_position == 0) {
+      file_handler = fopen(DISK_PATH, "rb");
+    }
+
+    if (file_handler == NULL) {
+      MessageBox(NULL, "Disk image not found!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    } else if (fseek(file_handler, disk_sector * DISK_SECTOR_SIZE + disk_position, SEEK_SET) != 0) {
+      MessageBox(NULL, "Error seeking in disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    } else if (fread(regs + current->dest, sizeof(unsigned short), 1, file_handler) != 1) {
+      MessageBox(NULL, "Error reading from disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    }
+
+    disk_position += sizeof(unsigned short);
+
+    if (disk_position == DISK_SECTOR_SIZE) {
+      fclose(file_handler);
+      file_handler = NULL;
+
+      disk_position = 0;
+    }
   }
+
   if (current->src2 == 15 &&
       current->dest != 15) // If addressed by program counter skip the extra word
     regs[15]++;
@@ -193,7 +225,8 @@ dosto:
     return;
   regs[15]++;
 
-  if (regs[current->src2] < IO_START) { // Area of memory that belongs to RAM
+  if (regs[current->src2] >= RAM_START &&
+      regs[current->src2] < IO_START) { // Area of memory that belongs to RAM
     regs[current->dest] =               // Store value both to destination register
         memory[regs[current->src2]] =   // and memory pointed by SRC2 register
         regs[current->src1];
@@ -205,9 +238,9 @@ dosto:
     accessed->src1 = (ir & 0x00F0) >> 4;              // 4 bits for src1
     accessed->src2 = (ir & 0x000F);                   // 4 bits for src2
 
-    if (regs[current->src2] >= 0xB000 && // Special case for memory belonging to video
-        regs[current->src2] < 0xFB00) {
-      int pos = (regs[current->src2] - 0xB000) *
+    if (regs[current->src2] >= VRAM_START && // Special case for memory belonging to video
+        regs[current->src2] < VRAM_END) {
+      int pos = (regs[current->src2] - VRAM_START) *
                 16; // 16 pixels per word, convert to relative position in bitmap
       unsigned short val = regs[current->src1];
       *(pBits + pos) =
@@ -230,6 +263,38 @@ dosto:
       *(pBits + pos + 14) = (val & 0x0002) ? 1 : 0;
       *(pBits + pos + 15) = (val & 0x0001) ? 1 : 0;
       videochanged = 1; // Video was changed
+    }
+  } else if (regs[current->src2] == DISK_COMMAND_PORT) {
+    regs[current->dest] = disk_command = regs[current->src1];
+
+    if (disk_command == 0) {
+      disk_sector = 0;
+      disk_position = 0;
+    }
+  } else if (regs[current->src2] == DISK_SECTOR_PORT) {
+    regs[current->dest] = disk_sector = regs[current->src1];
+  } else if (regs[current->src2] == DISK_DATA_PORT) {
+    if (disk_command == 1 && disk_position == 0) {
+      file_handler = fopen(DISK_PATH, "rb+");
+    }
+
+    if (file_handler == NULL) {
+      MessageBox(NULL, "Disk image not found!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    } else if (fseek(file_handler, disk_sector * DISK_SECTOR_SIZE + disk_position, SEEK_SET) != 0) {
+      MessageBox(NULL, "Error seeking in disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    } else if (fwrite(regs + current->src1, sizeof(unsigned short), 1, file_handler) != 1) {
+      MessageBox(NULL, "Error reading from disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    } else {
+      regs[current->dest] = regs[current->src1];
+    }
+
+    disk_position += sizeof(unsigned short);
+
+    if (disk_position == DISK_SECTOR_SIZE) {
+      fclose(file_handler);
+      file_handler = NULL;
+
+      disk_position = 0;
     }
   } else { // Area of memory that belongs to ROM or unidirectional I/O device
     regs[current->dest] = regs[current->src1]; // Do not update memory, just destination register
@@ -305,6 +370,19 @@ domaj:
 
   current = instrmem + regs[15];
   goto *(current->execaddr);
+}
+
+void bootstrap(const char *boot_img) {
+  FILE *prom = fopen(boot_img, "r");
+
+  if (prom == NULL) {
+    MessageBox(NULL, "Memory load fail!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    exit(EXIT_FAILURE);
+  }
+
+  fread(memory + ROM_START, 1, RAM_START - ROM_START, prom); // Load ROM
+
+  fclose(prom);
 }
 
 // Now we assume that MemoryDC is created and bitmap selected
@@ -469,6 +547,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   SetWindowPos(hwndMain, 0, xPos, yPos, 0, 0,
                SWP_NOZORDER | SWP_NOSIZE); // Center the window on the screen
   UpdateWindow(hwndMain);                  // Update and display the window
+
+  bootstrap("boot.img");
 
   CreateDIB(); // Create the DIB (Device-Independent Bitmap) for display simulated video memory
   FILE *prom = fopen("forth.mem", "r"); // Open a file with simulated RAM content

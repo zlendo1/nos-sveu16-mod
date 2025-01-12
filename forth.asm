@@ -33,14 +33,14 @@ ECR   CON 13        ; Carriage return
 ELF   CON 10        ; Line feed
 EBS   CON 8         ; Backspace
 EBL   CON 32        ; Blank
-MEMB  CON $0000     ; Start of memory
-MEME  CON $AF00     ; End of memory
-ETIB  CON $AEB0     ;  MEME-NTIB-2 Terminal Input buffer
-ESPP  CON $AEB0     ; ETIB  Start of data stack
-ERP   CON $AE70     ;  ESPP-NSP*CELL1  Start of return stack
-EUP   CON $AE30     ; ERP-NRP*CELL1 Start of user area
+MEMB  CON $0100     ; Start of memory
+MEME  CON $1F00     ; End of memory
+ETIB  CON $1EB0     ;  MEME-NTIB-2 Terminal Input buffer
+ESPP  CON $1EB0     ; ETIB  Start of data stack
+ERP   CON $1E70     ;  ESPP-NSP*CELL1  Start of return stack
+EUP   CON $1E30     ; ERP-NRP*CELL1 Start of user area
 
-      ORG $0000  ; MEMB
+      ORG $0100  ; MEMB
 
 
 RESET:
@@ -185,7 +185,7 @@ UIF1  LOD R5,R5,R2    ; POP TOP VALUE FROM DATA STACK
       ORA R15,R9,R9  ; JUMP NEXT1
 ;   C!		( c b -- )
 ;		Pop the data stack to byte memory.
-; Example: HEX FF B000 C! pokes to video memory
+; Example: HEX FF 2000 C! pokes to video memory
       WRD L004
 L005  WRD $02
       TXT "C!"
@@ -594,7 +594,7 @@ TXST1 LOD R5,R5,R2    ; POP CHARACTER TO DISPLAY
       ORA R15,R9,R9  ; JUMP NEXT1
 ; *******************************************************************************
 ; * PLATFORM SPECIFIC ROUTINE TO PUT CHARACTER IN R5 TO GRAPHICAL VIDEO MEMORY  *
-; * RESOLUTION 640x480 MONOCHROME, BIT PER PIXEL AT &B000                       *
+; * RESOLUTION 640x480 MONOCHROME, BIT PER PIXEL AT &2000                       *
 ; *******************************************************************************
 
 DRAWCHAR:
@@ -645,8 +645,8 @@ PRINTABLECH:        ; Printable character
   LOD R6,R6,R15     ; Put font definition address to R6
   WRD FONT
   ADD R5,R5,R6      ; Now R5 points to character definition
-  LOD R6,R6,R15     ; Address of video memory $B000 to R6
-  WRD $B000
+  LOD R6,R6,R15     ; Address of video memory $2000 to R6
+  WRD $2000
   ADD R6,R6,R8      ; Add relative position of the character on the screen. Now R6 points to video memory, R5 to char definition
   LOD R8,R8,R15   ; Mask for upper byte
   WRD $00FF
@@ -752,7 +752,7 @@ LINEFEED:
   STO R4,R4,R12  ; PUT TO LAST ROW CURSOR
 SCROLL:          ; We need to scroll
   LOD R4,R4,R15  ; Point R4 to top of video memory
-  WRD $B000
+  WRD $2000
   LOD R6,R6,R15  ; Point R6 to 8-th pixel row
   WRD $B140
   LOD R8,R8,R15  ; Length of video memory to be copied
