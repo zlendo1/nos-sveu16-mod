@@ -6,9 +6,14 @@ emulgui_i686: emulgui.c
 
 forth:
 	wine asem.exe forth.asm forth.mem
+	./expand_file forth.mem forth.img 16000
+
+boot:
+	wine asem.exe boot.asm boot.img
+	./expand_file boot.img boot.img 512
 
 clean:
 	@rm -f emulgui*.exe
 	@rm -f forth.mem
 
-all: emulgui_x86_64 emulgui_i686 forth
+all: emulgui_x86_64 emulgui_i686 forth boot
