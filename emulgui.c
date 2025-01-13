@@ -243,10 +243,9 @@ dosto:
       int pos = (regs[current->src2] - VRAM_START) *
                 16; // 16 pixels per word, convert to relative position in bitmap
       unsigned short val = regs[current->src1];
-      *(pBits + pos) =
-          (val & 0x8000)
-              ? 1
-              : 0; // Now for each bit in SRC1 register change corresponding byte in bitmap
+
+      // Now for each bit in SRC1 register change corresponding byte in bitmap
+      *(pBits + pos) = (val & 0x8000) ? 1 : 0;
       *(pBits + pos + 1) = (val & 0x4000) ? 1 : 0;
       *(pBits + pos + 2) = (val & 0x2000) ? 1 : 0;
       *(pBits + pos + 3) = (val & 0x1000) ? 1 : 0;
@@ -262,6 +261,7 @@ dosto:
       *(pBits + pos + 13) = (val & 0x0004) ? 1 : 0;
       *(pBits + pos + 14) = (val & 0x0002) ? 1 : 0;
       *(pBits + pos + 15) = (val & 0x0001) ? 1 : 0;
+
       videochanged = 1; // Video was changed
     }
   } else if (regs[current->src2] == DISK_COMMAND_PORT) {
@@ -443,8 +443,8 @@ void CreateDIB() {
   hdc = GetDC(hwndMain);
   int i;
   bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-  bi.bmiHeader.biWidth = 640;          // 640 pixels width
-  bi.bmiHeader.biHeight = -480;        // 480 pixels height negative number == top down DIB
+  bi.bmiHeader.biWidth = 900;          // 900 pixels width
+  bi.bmiHeader.biHeight = -500;        // 500 pixels height negative number == top down DIB
   bi.bmiHeader.biPlanes = 1;           // Number of planes must be set to 1
   bi.bmiHeader.biBitCount = 8;         // 8 bits per pixel, easiest way to access each pixel
   bi.bmiHeader.biCompression = BI_RGB; // No compression
@@ -486,8 +486,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
     PostQuitMessage(0); // Main Window loop will end
     break;
   }
-  case WM_CHAR: {           // Key pressed
-    asciikeyboard = wParam; // Get ASCII code of key
+  case WM_KEYDOWN: {                       // Key pressed
+    asciikeyboard = (lparam >> 16) & 0xFF; // Get ASCII code of key
     break;
   }
   case WM_PAINT: {               // Main window overlapped or changed size
