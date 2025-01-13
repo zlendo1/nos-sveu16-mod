@@ -594,7 +594,7 @@ TXST1 LOD R5,R5,R2    ; POP CHARACTER TO DISPLAY
       ORA R15,R9,R9  ; JUMP NEXT1
 ; *******************************************************************************
 ; * PLATFORM SPECIFIC ROUTINE TO PUT CHARACTER IN R5 TO GRAPHICAL VIDEO MEMORY  *
-; * RESOLUTION 640x480 MONOCHROME, BIT PER PIXEL AT &2000                       *
+; * RESOLUTION 80x25 16 SEGMENT, BIT PER SEGMENT AT &2000                       *
 ; *******************************************************************************
 
 DRAWCHAR:
@@ -634,79 +634,19 @@ PRINTABLECH:        ; Printable character
   LOD R8,R8,R15     ; Get address of Y coordinate
   WRD YVAL
   LOD R8,R8,R8      ; Get value of Y coordinate (Row)
-  LOD R2,R2,R15     ; 16 pixels are in one word, one row of 640 pixels takes 640/16=40 words, 8 rows take 8x40=320 words
-  WRD 320
-  MUL R8,R8,R2      ; After row is multiplied by 320 we have relative position of the row start in video memory
+  LOD R2,R2,R15     ; 16 segments are in one word, one row of 80 characters takes 80 words
+  WRD 80
+  MUL R8,R8,R2      ; After row is multiplied by 80 we have relative position of the row start in video memory
   AND R11,R7,R1     ; Lowest bit of Y coordinate (odd=1/even=0) is stored in R11
   SHR R7,R7,R1      ; Divide Y coordinate by 2
   ADD R8,R8,R7      ; Now we point to 16 bit word in video memory where or character is located
-  ADD R5,R5,R5      ; Multiply ASCII code by 2
-  ADD R5,R5,R5      ; now by 4, because each character in the font definition takes 4 words
   LOD R6,R6,R15     ; Put font definition address to R6
   WRD FONT
   ADD R5,R5,R6      ; Now R5 points to character definition
   LOD R6,R6,R15     ; Address of video memory $2000 to R6
   WRD $2000
   ADD R6,R6,R8      ; Add relative position of the character on the screen. Now R6 points to video memory, R5 to char definition
-  LOD R8,R8,R15   ; Mask for upper byte
-  WRD $00FF
-  LOD R9,R9,R15   ; Mask for lower byte
-  WRD $FF00
-  LOD R7,R7,R15   ; Distance in video memory to next line
-  WRD 40
-  LOD R12,R12,R15 ; Rotate 8 times constant
-  WRD $38
-  LOD R0,R0,R15     ; R0 is loop counter, loop is executed 4 times, from 5 to 1
-  WRD 5                  
-  LOD R2,R2,R15     ; Address of routine that shows character in right position of 16 bit word in video
-  WRD RIGHTCHR
-  MIF R15,R11,R2    ; Jump to it if odd column
-LEFTCHR:
-  ORA R11,R15,R15   ; Remember LEFTLOOP
-LEFTLOOP:
-  LOD R2,R2,R5    ; Get 2 bytes of font definition
-  LOD R4,R4,R6    ; Get 2 bytes from video memory to R4, line 0
-  AND R4,R4,R8    ; Left version: keep lower byte (right pixels) from video memory word
-  AND R10,R2,R9   ; Upper 8 bits from font to R10
-  ORA R4,R4,R10   ; Mix pixels from font and video
-  STO R4,R4,R6    ; Store to video memory
-  SHR R2,R2,R12   ; Rotate font definition, bring lower pixels to upper
-  ADD R6,R6,R7    ; Next row in video memory
-  LOD R4,R4,R6    ; Get 2 bytes from video memory to R4 , line 1
-  AND R4,R4,R8    ; Left version: keep lower byte
-  AND R10,R2,R9   ; Upper 8 bits from font to R10
-  ORA R4,R4,R10   ; Mix pixels from font and video
-  STO R4,R4,R6    ; Store to video memory
-  ADD R6,R6,R7    ; Next row in video memory
-  ADD R5,R5,R1    ; Next row in font definiton
-  SUB R0,R0,R1    ; Decrement loop counter
-  GTU R2,R0,R1    ; If not counter=1
-  MIF R15,R2,R11  ; then jump to LEFTLOOP
-  LOD R15,R15,R15 ; Absolute jump to NEXTCOL
-  WRD NEXTCOL
-
-RIGHTCHR:
-  ORA R11,R15,R15   ; Remember RIGHTLOOP
-RIGHTLOOP:
-  LOD R2,R2,R5    ; Get 2 bytes of font definition
-  LOD R4,R4,R6    ; Get 2 bytes from video memory , line 0
-  AND R4,R4,R9    ; Right version: keep left pixels from video memory word
-  AND R10,R2,R9   ; Upper 8 bits from font to R10
-  SHR R10,R10,R12  ; Bring upper pixels of font to lower
-  ORA R4,R4,R10   ; Mix pixels from font and video
-  STO R4,R4,R6    ; Store to video memory
-  ADD R6,R6,R7    ; Next row in video memory
-  LOD R4,R4,R6    ; Get 2 bytes from video memory , line 1
-  AND R4,R4,R9    ; Right version: keep upper byte from video memory
-  AND R10,R2,R8   ; Lower 8 bits from font to R10
-  ORA R4,R4,R10   ; Mix pixels from font and video
-  STO R4,R4,R6    ; Store to video memory
-  ADD R6,R6,R7    ; Next row in video memory
-  ADD R5,R5,R1    ; Next row in font definiton
-  SUB R0,R0,R1    ; Decrement loop counter
-  GTU R2,R0,R1    ; If not counter=1
-  MIF R15,R2,R11  ; then jump to RIGHTLOOP
-
+  STO R5,R5,R6      ; Superior method gets saved right ahead, no need for gymnastics
 NEXTCOL:           ; Now adjust XCOL variable
   LOD R12,R12,R15  ; Take XVAL address to R12
   WRD XVAL
@@ -743,7 +683,7 @@ LINEFEED:
   ADD R5,R5,R1     ; Increment
   STO R5,R5,R12    ; Store
   LOD R4,R4,R15    ; R4=60
-  WRD 60
+  WRD 25
   LOD R11,R11,R15  ; Point R11 to EXITCHAR
   WRD EXITCHAR
   LTU R7,R5,R4     ; If new value of char is below 60
@@ -754,9 +694,9 @@ SCROLL:          ; We need to scroll
   LOD R4,R4,R15  ; Point R4 to top of video memory
   WRD $2000
   LOD R6,R6,R15  ; Point R6 to 8-th pixel row
-  WRD $B140
-  LOD R8,R8,R15  ; Length of video memory to be copied
-  WRD 18880
+  WRD $2050
+  LOD R8,R8,R15  ; Length of video memory to be copied (memory - row_of_words)
+  WRD 1920
   MAJ R11,R15,R15  ; MARK POINT
 SCROLLLOOP:
   LOD R5,R5,R6     ; Get word from higher address in video memory (lower on screen)
@@ -767,8 +707,8 @@ SCROLLLOOP:
   GTU R7,R8,R0     ; We are at zero?
   MIF R15,R7,R11   ; Jump to scroll loop if not
 EMPTYLAST:         ; Last character roww need to be cleared
-  LOD R8,R8,R15    ; 320 words is length of this part
-  WRD 320
+  LOD R8,R8,R15    ; 80 words is length of this part
+  WRD 80
   MAJ R11,R15,R15  ; MARK POINT
 EMPTYLASTLP:
   STO R0,R0,R4     ; Clear video word
@@ -789,10 +729,10 @@ DOBS:
   LOD R4,R4,R15   ; TAKE BS1 LABEL TO R4  
   WRD BS1
   MIF R15,R7,R4   ; SKIP UPDATING Y COORDINATE IF NOT X>0
-  LOD R6,R6,R15   ; X=80 
-  WRD 80
+  LOD R6,R6,R15   ; X=10 (TODO: I have no idea about this, used to be 80, changed to 10 by the logic that all width was divided by 8)
+  WRD 10
   EQU R10,R9,R0   ; If Y=0 
-  ADD R15,R15,R10 : Skip decrementing
+  ADD R15,R15,R10 ; Skip decrementing
   SUB R9,R9,R1    ; DECREMENT Y
 BS1:
   SUB R6,R6,R1    ; DECREMENT X
@@ -803,1302 +743,526 @@ BS1:
   ORA R15,R11,R11 
 DOCR:
   LOD R12,R12,R15 ; READ ADDRESS OF LOCATION THAT KEEPS X COORDINATE OF THE CURRENT CHARACTER (0-79)
+                  ; TODO: Ask about this too
   WRD XVAL
   STO R0,R0,R12   ; PUT 0 TO ADDRESS POINTED BY R12
   LOD R11,R11,R15 ; PUT ADDRESS OF EXITCHAR ROUTINE TO R11
   WRD EXITCHAR
   ORA R15,R11,R11 ; JUMP TO EXITCHAR
   
-FONT                        ; THIS IS FONT 8x8 PIXELS SEE ASCII 65 TO UNDERSTAND FORMAT
+FONT                        ; ANSII TO 16 SEGMENT CONVERSION
  ; ASCII 0 
   WRD $0000
-  WRD $0000
-  WRD $0000
-  WRD $0000
  ; ASCII 1 
-  WRD $7E81
-  WRD $A581
-  WRD $9DB9
-  WRD $817E
+  WRD $0000
  ; ASCII 2 
-  WRD $7EFF
-  WRD $DBFF
-  WRD $E3C7
-  WRD $FF7E
+  WRD $0000
  ; ASCII 3 
-  WRD $6CFE
-  WRD $FEFE
-  WRD $7C38
-  WRD $1000
+  WRD $0000
  ; ASCII 4 
-  WRD $1038
-  WRD $7CFE
-  WRD $7C38
-  WRD $1000
+  WRD $0000
  ; ASCII 5 
-  WRD $387C
-  WRD $38FE
-  WRD $FE10
-  WRD $107C
+  WRD $0000
  ; ASCII 6 
-  WRD $0018
-  WRD $3C7E
-  WRD $FF7E
-  WRD $187E
+  WRD $0000
  ; ASCII 7 
   WRD $0000
-  WRD $183C
-  WRD $3C18
-  WRD $0000
  ; ASCII 8 
-  WRD $FFFF
-  WRD $E7C3
-  WRD $C3E7
-  WRD $FFFF
+  WRD $0000
  ; ASCII 9 
-  WRD $003C
-  WRD $6642
-  WRD $4266
-  WRD $3C00
+  WRD $0000
  ; ASCII 10 
-  WRD $FFC3
-  WRD $99BD
-  WRD $BD99
-  WRD $C3FF
+  WRD $0000
  ; ASCII 11 
-  WRD $0F07
-  WRD $0F7D
-  WRD $CCCC
-  WRD $CC78
+  WRD $0000
  ; ASCII 12 
-  WRD $3C66
-  WRD $6666
-  WRD $3C18
-  WRD $7E18
+  WRD $0000
  ; ASCII 13 
-  WRD $3F33
-  WRD $3F30
-  WRD $3070
-  WRD $F0E0
+  WRD $0000
  ; ASCII 14 
-  WRD $7F63
-  WRD $7F63
-  WRD $6367
-  WRD $E6C0
+  WRD $0000
  ; ASCII 15 
-  WRD $995A
-  WRD $3CE7
-  WRD $E73C
-  WRD $5A99
+  WRD $0000
  ; ASCII 16 
-  WRD $80E0
-  WRD $F8FE
-  WRD $F8E0
-  WRD $8000
+  WRD $0000
  ; ASCII 17 
-  WRD $020E
-  WRD $3EFE
-  WRD $3E0E
-  WRD $0200
+  WRD $0000
  ; ASCII 18 
-  WRD $183C
-  WRD $7E18
-  WRD $187E
-  WRD $3C18
+  WRD $0000
  ; ASCII 19 
-  WRD $6666
-  WRD $6666
-  WRD $6600
-  WRD $6600
+  WRD $0000
  ; ASCII 20 
-  WRD $7FDB
-  WRD $DB7B
-  WRD $1B1B
-  WRD $1B00
+  WRD $0000
  ; ASCII 21 
-  WRD $3F60
-  WRD $7C66
-  WRD $663E
-  WRD $06FC
+  WRD $0000
  ; ASCII 22 
   WRD $0000
-  WRD $0000
-  WRD $7E7E
-  WRD $7E00
  ; ASCII 23 
-  WRD $183C
-  WRD $7E18
-  WRD $7E3C
-  WRD $18FF
+  WRD $0000
  ; ASCII 24 
-  WRD $183C
-  WRD $7E18
-  WRD $1818
-  WRD $1800
+  WRD $0000
  ; ASCII 25 
-  WRD $1818
-  WRD $1818
-  WRD $7E3C
-  WRD $1800
+  WRD $0000
  ; ASCII 26 
-  WRD $0018
-  WRD $0CFE
-  WRD $0C18
   WRD $0000
  ; ASCII 27 
-  WRD $0030
-  WRD $60FE
-  WRD $6030
   WRD $0000
  ; ASCII 28 
   WRD $0000
-  WRD $C0C0
-  WRD $C0FE
-  WRD $0000
  ; ASCII 29 
-  WRD $0024
-  WRD $66FF
-  WRD $6624
   WRD $0000
  ; ASCII 30 
-  WRD $0018
-  WRD $3C7E
-  WRD $FFFF
   WRD $0000
  ; ASCII 31 
-  WRD $00FF
-  WRD $FF7E
-  WRD $3C18
   WRD $0000
  ; ASCII 32 
-  WRD $0000
-  WRD $0000
-  WRD $0000
-  WRD $0000
+  WRD $0000 ; NONE BEFORE THIS ARE PRINTABLE ANYWAYS
  ; ASCII 33 
-  WRD $1818
-  WRD $1818
-  WRD $1800
-  WRD $1800
+  WRD 0x000C
  ; ASCII 34 
-  WRD $6C6C
-  WRD $6C00
-  WRD $0000
-  WRD $0000
+	WRD 0x0204
  ; ASCII 35 
-  WRD $6C6C
-  WRD $FE6C
-  WRD $FE6C
-  WRD $6C00
+	WRD 0xAA3C
  ; ASCII 36 
-  WRD $187E
-  WRD $C07C
-  WRD $06FC
-  WRD $1800
+	WRD 0xAABB
  ; ASCII 37 
-  WRD $00C6
-  WRD $CC18
-  WRD $3066
-  WRD $C600
+	WRD 0xEE99
  ; ASCII 38 
-  WRD $386C
-  WRD $3876
-  WRD $DCCC
-  WRD $7600
+	WRD 0x9371
  ; ASCII 39 
-  WRD $3030
-  WRD $6000
-  WRD $0000
-  WRD $0000
+	WRD 0x0200
  ; ASCII 40 
-  WRD $0C18
-  WRD $3030
-  WRD $3018
-  WRD $0C00
+	WRD 0x1400
  ; ASCII 41 
-  WRD $3018
-  WRD $0C0C
-  WRD $0C18
-  WRD $3000
+	WRD 0x4100
  ; ASCII 42 
-  WRD $0066
-  WRD $3CFF
-  WRD $3C66
-  WRD $0000
+	WRD 0xFF00
  ; ASCII 43 
-  WRD $0018
-  WRD $187E
-  WRD $1818
-  WRD $0000
+	WRD 0xAA00
  ; ASCII 44 
-  WRD $0000
-  WRD $0000
-  WRD $0018
-  WRD $1830
+	WRD 0x4000
  ; ASCII 45 
-  WRD $0000
-  WRD $007E
-  WRD $0000
-  WRD $0000
+	WRD 0x8800
  ; ASCII 46 
-  WRD $0000
-  WRD $0000
-  WRD $0018
-  WRD $1800
+	WRD 0x1000
  ; ASCII 47 
-  WRD $060C
-  WRD $1830
-  WRD $60C0
-  WRD $8000
+	WRD 0x4400
  ; ASCII 48 
-  WRD $7CCE
-  WRD $DEF6
-  WRD $E6C6
-  WRD $7C00
+	WRD 0x44FF
  ; ASCII 49 
-  WRD $1838
-  WRD $1818
-  WRD $1818
-  WRD $7E00
+	WRD 0x040C
  ; ASCII 50 
-  WRD $7CC6
-  WRD $067C
-  WRD $C0C0
-  WRD $FE00
+	WRD 0x8877
  ; ASCII 51 
-  WRD $FC06
-  WRD $063C
-  WRD $0606
-  WRD $FC00
+	WRD 0x083F
  ; ASCII 52 
-  WRD $0CCC
-  WRD $CCCC
-  WRD $FE0C
-  WRD $0C00
+	WRD 0x888C
  ; ASCII 53 
-  WRD $FEC0
-  WRD $FC06
-  WRD $06C6
-  WRD $7C00
+	WRD 0x90B3
  ; ASCII 54 
-  WRD $7CC0
-  WRD $C0FC
-  WRD $C6C6
-  WRD $7C00
+	WRD 0x88FB
  ; ASCII 55 
-  WRD $FE06
-  WRD $060C
-  WRD $1830
-  WRD $3000
+	WRD 0x000F
  ; ASCII 56 
-  WRD $7CC6
-  WRD $C67C
-  WRD $C6C6
-  WRD $7C00
+	WRD 0x88FF
  ; ASCII 57 
-  WRD $7CC6
-  WRD $C67E
-  WRD $0606
-  WRD $7C00
+	WRD 0x88BF
  ; ASCII 58 
-  WRD $0018
-  WRD $1800
-  WRD $0018
-  WRD $1800
+	WRD 0x2200
  ; ASCII 59 
-  WRD $0018
-  WRD $1800
-  WRD $0018
-  WRD $1830
+	WRD 0x4200
  ; ASCII 60 
-  WRD $0C18
-  WRD $3060
-  WRD $3018
-  WRD $0C00
+	WRD 0x9400
  ; ASCII 61 
-  WRD $0000
-  WRD $7E00
-  WRD $7E00
-  WRD $0000
+	WRD 0x8830
  ; ASCII 62 
-  WRD $3018
-  WRD $0C06
-  WRD $0C18
-  WRD $3000
+	WRD 0x4900
  ; ASCII 63 
-  WRD $3C66
-  WRD $0C18
-  WRD $1800
-  WRD $1800
+	WRD 0x2807
  ; ASCII 64 
-  WRD $7CC6
-  WRD $DEDE
-  WRD $DEC0
-  WRD $7E00
+	WRD 0x0AF7
  ; ASCII 65 
-  WRD $386C
-  WRD $C6C6
-  WRD $FEC6
-  WRD $C600
-             ; 38     00111000  ..###...
-             ; 6C     01101100  .##.##..
-             ; C6     11000110  ##...##.
-             ; C6     11000110  ##...##.
-             ; FE     11111110  #######.
-             ; C6     11000110  ##...##.
-             ; C6     11000110  ##...##.
-             ; 00     00000000  ........
-
+	WRD 0x88CF
  ; ASCII 66 
-  WRD $FCC6
-  WRD $C6FC
-  WRD $C6C6
-  WRD $FC00
+	WRD 0x2A3F
  ; ASCII 67 
-  WRD $7CC6
-  WRD $C0C0
-  WRD $C0C6
-  WRD $7C00
+	WRD 0x00F3
  ; ASCII 68 
-  WRD $F8CC
-  WRD $C6C6
-  WRD $C6CC
-  WRD $F800
+	WRD 0x223F
  ; ASCII 69 
-  WRD $FEC0
-  WRD $C0F8
-  WRD $C0C0
-  WRD $FE00
+	WRD 0x80F3
  ; ASCII 70 
-  WRD $FEC0
-  WRD $C0F8
-  WRD $C0C0
-  WRD $C000
+	WRD 0x80C3
  ; ASCII 71 
-  WRD $7CC6
-  WRD $C0C0
-  WRD $CEC6
-  WRD $7C00
+	WRD 0x08FB
  ; ASCII 72 
-  WRD $C6C6
-  WRD $C6FE
-  WRD $C6C6
-  WRD $C600
+	WRD 0x88CC
  ; ASCII 73 
-  WRD $7E18
-  WRD $1818
-  WRD $1818
-  WRD $7E00
+	WRD 0x2233
  ; ASCII 74 
-  WRD $0606
-  WRD $0606
-  WRD $06C6
-  WRD $7C00
+	WRD 0x007C
  ; ASCII 75 
-  WRD $C6CC
-  WRD $D8F0
-  WRD $D8CC
-  WRD $C600
+	WRD 0x94C0
  ; ASCII 76 
-  WRD $C0C0
-  WRD $C0C0
-  WRD $C0C0
-  WRD $FE00
+	WRD 0x00F0
  ; ASCII 77 
-  WRD $C6EE
-  WRD $FEFE
-  WRD $D6C6
-  WRD $C600
+	WRD 0x05CC
  ; ASCII 78 
-  WRD $C6E6
-  WRD $F6DE
-  WRD $CEC6
-  WRD $C600
+	WRD 0x11CC
  ; ASCII 79 
-  WRD $7CC6
-  WRD $C6C6
-  WRD $C6C6
-  WRD $7C00
+	WRD 0x00FF
  ; ASCII 80 
-  WRD $FCC6
-  WRD $C6FC
-  WRD $C0C0
-  WRD $C000
+	WRD 0x88C7
  ; ASCII 81 
-  WRD $7CC6
-  WRD $C6C6
-  WRD $D6DE
-  WRD $7C06
+	WRD 0x10FF
  ; ASCII 82 
-  WRD $FCC6
-  WRD $C6FC
-  WRD $D8CC
-  WRD $C600
+	WRD 0x98C7
  ; ASCII 83 
-  WRD $7CC6
-  WRD $C07C
-  WRD $06C6
-  WRD $7C00
+	WRD 0x88BB
  ; ASCII 84 
-  WRD $FF18
-  WRD $1818
-  WRD $1818
-  WRD $1800
+	WRD 0x2203
  ; ASCII 85 
-  WRD $C6C6
-  WRD $C6C6
-  WRD $C6C6
-  WRD $FE00
+	WRD 0x00FC
  ; ASCII 86 
-  WRD $C6C6
-  WRD $C6C6
-  WRD $C67C
-  WRD $3800
+	WRD 0x44C0
  ; ASCII 87 
-  WRD $C6C6
-  WRD $C6C6
-  WRD $D6FE
-  WRD $6C00
+	WRD 0x50CC
  ; ASCII 88 
-  WRD $C6C6
-  WRD $6C38
-  WRD $6CC6
-  WRD $C600
+	WRD 0x5500
  ; ASCII 89 
-  WRD $C6C6
-  WRD $C67C
-  WRD $1830
-  WRD $E000
+	WRD 0x88BC
  ; ASCII 90 
-  WRD $FE06
-  WRD $0C18
-  WRD $3060
-  WRD $FE00
+	WRD 0x4433
  ; ASCII 91 
-  WRD $3C30
-  WRD $3030
-  WRD $3030
-  WRD $3C00
+	WRD 0x2212
  ; ASCII 92 
-  WRD $C060
-  WRD $3018
-  WRD $0C06
-  WRD $0200
+	WRD 0x1100
  ; ASCII 93 
-  WRD $3C0C
-  WRD $0C0C
-  WRD $0C0C
-  WRD $3C00
+	WRD 0x2221
  ; ASCII 94 
-  WRD $1038
-  WRD $6CC6
-  WRD $0000
-  WRD $0000
+	WRD 0x5000
  ; ASCII 95 
-  WRD $0000
-  WRD $0000
-  WRD $0000
-  WRD $00FF
+	WRD 0x0030
  ; ASCII 96 
-  WRD $1818
-  WRD $0C00
-  WRD $0000
-  WRD $0000
+	WRD 0x0100
  ; ASCII 97 
-  WRD $0000
-  WRD $7C06
-  WRD $7EC6
-  WRD $7E00
+	WRD 0xA070
  ; ASCII 98 
-  WRD $C0C0
-  WRD $C0FC
-  WRD $C6C6
-  WRD $FC00
+	WRD 0xA0E0
  ; ASCII 99 
-  WRD $0000
-  WRD $7CC6
-  WRD $C0C6
-  WRD $7C00
+	WRD 0x8060
  ; ASCII 100 
-  WRD $0606
-  WRD $067E
-  WRD $C6C6
-  WRD $7E00
+	WRD 0x281C
  ; ASCII 101 
-  WRD $0000
-  WRD $7CC6
-  WRD $FEC0
-  WRD $7C00
+	WRD 0xC060
  ; ASCII 102 
-  WRD $1C36
-  WRD $3078
-  WRD $3030
-  WRD $7800
+	WRD 0xAA02
  ; ASCII 103 
-  WRD $0000
-  WRD $7EC6
-  WRD $C67E
-  WRD $06FC
+	WRD 0xA2A1
  ; ASCII 104 
-  WRD $C0C0
-  WRD $FCC6
-  WRD $C6C6
-  WRD $C600
+	WRD 0xA0C0
  ; ASCII 105 
-  WRD $1800
-  WRD $3818
-  WRD $1818
-  WRD $3C00
+	WRD 0x2000
  ; ASCII 106 
-  WRD $0600
-  WRD $0606
-  WRD $0606
-  WRD $C67C
+	WRD 0x2260
  ; ASCII 107 
-  WRD $C0C0
-  WRD $CCD8
-  WRD $F8CC
-  WRD $C600
+	WRD 0x3600
  ; ASCII 108 
-  WRD $3818
-  WRD $1818
-  WRD $1818
-  WRD $3C00
+	WRD 0x00C0
  ; ASCII 109 
-  WRD $0000
-  WRD $CCFE
-  WRD $FED6
-  WRD $D600
+	WRD 0xA848
  ; ASCII 110 
-  WRD $0000
-  WRD $FCC6
-  WRD $C6C6
-  WRD $C600
+	WRD 0xA040
  ; ASCII 111 
-  WRD $0000
-  WRD $7CC6
-  WRD $C6C6
-  WRD $7C00
+	WRD 0xA060
  ; ASCII 112 
-  WRD $0000
-  WRD $FCC6
-  WRD $C6FC
-  WRD $C0C0
+	WRD 0x82C1
  ; ASCII 113 
-  WRD $0000
-  WRD $7EC6
-  WRD $C67E
-  WRD $0606
+	WRD 0xA281
  ; ASCII 114 
-  WRD $0000
-  WRD $FCC6
-  WRD $C0C0
-  WRD $C000
+	WRD 0x8040
  ; ASCII 115 
-  WRD $0000
-  WRD $7EC0
-  WRD $7C06
-  WRD $FC00
+	WRD 0xA0A1
  ; ASCII 116 
-  WRD $1818
-  WRD $7E18
-  WRD $1818
-  WRD $0E00
+	WRD 0x80E0
  ; ASCII 117 
-  WRD $0000
-  WRD $C6C6
-  WRD $C6C6
-  WRD $7E00
+	WRD 0x2060
  ; ASCII 118 
-  WRD $0000
-  WRD $C6C6
-  WRD $C67C
-  WRD $3800
+	WRD 0x4040
  ; ASCII 119 
-  WRD $0000
-  WRD $C6C6
-  WRD $D6FE
-  WRD $6C00
+	WRD 0x5048
  ; ASCII 120 
-  WRD $0000
-  WRD $C66C
-  WRD $386C
-  WRD $C600
+	WRD 0x5500
  ; ASCII 121 
-  WRD $0000
-  WRD $C6C6
-  WRD $C67E
-  WRD $06FC
+	WRD 0x0A1C
  ; ASCII 122 
-  WRD $0000
-  WRD $FE0C
-  WRD $3860
-  WRD $FE00
+	WRD 0xC020
  ; ASCII 123 
-  WRD $0E18
-  WRD $1870
-  WRD $1818
-  WRD $0E00
+	WRD 0xA212
  ; ASCII 124 
-  WRD $1818
-  WRD $1800
-  WRD $1818
-  WRD $1800
+	WRD 0x2200
  ; ASCII 125 
-  WRD $7018
-  WRD $180E
-  WRD $1818
-  WRD $7000
+	WRD 0x2A21
  ; ASCII 126 
-  WRD $76DC
-  WRD $0000
-  WRD $0000
-  WRD $0000
+	WRD 0xCC00
  ; ASCII 127 
-  WRD $0010
-  WRD $386C
-  WRD $C6C6
-  WRD $FE00
+	WRD 0x0000
  ; ASCII 128 
-  WRD $7CC6
-  WRD $C0C0
-  WRD $C0D6
-  WRD $7C30
+  WRD $7CC6 ; THESE DO NOT MATTER
  ; ASCII 129 
   WRD $C600
-  WRD $C6C6
-  WRD $C6C6
-  WRD $7E00
  ; ASCII 130 
   WRD $0E00
-  WRD $7CC6
-  WRD $FEC0
-  WRD $7C00
  ; ASCII 131 
   WRD $7E81
-  WRD $3C06
-  WRD $7EC6
-  WRD $7E00
  ; ASCII 132 
   WRD $6600
-  WRD $7C06
-  WRD $7EC6
-  WRD $7E00
  ; ASCII 133 
   WRD $E000
-  WRD $7C06
-  WRD $7EC6
-  WRD $7E00
  ; ASCII 134 
   WRD $1818
-  WRD $7C06
-  WRD $7EC6
-  WRD $7E00
  ; ASCII 135 
   WRD $0000
-  WRD $7CC6
-  WRD $C0D6
-  WRD $7C30
  ; ASCII 136 
   WRD $7E81
-  WRD $7CC6
-  WRD $FEC0
-  WRD $7C00
  ; ASCII 137 
   WRD $6600
-  WRD $7CC6
-  WRD $FEC0
-  WRD $7C00
  ; ASCII 138 
   WRD $E000
-  WRD $7CC6
-  WRD $FEC0
-  WRD $7C00
  ; ASCII 139 
   WRD $6600
-  WRD $3818
-  WRD $1818
-  WRD $3C00
  ; ASCII 140 
   WRD $7C82
-  WRD $3818
-  WRD $1818
-  WRD $3C00
  ; ASCII 141 
   WRD $7000
-  WRD $3818
-  WRD $1818
-  WRD $3C00
  ; ASCII 142 
   WRD $C610
-  WRD $7CC6
-  WRD $FEC6
-  WRD $C600
  ; ASCII 143 
   WRD $3838
-  WRD $007C
-  WRD $C6FE
-  WRD $C600
  ; ASCII 144 
   WRD $0E00
-  WRD $FEC0
-  WRD $F8C0
-  WRD $FE00
  ; ASCII 145 
   WRD $0000
-  WRD $7F0C
-  WRD $7FCC
-  WRD $7F00
  ; ASCII 146 
   WRD $3F6C
-  WRD $CCFF
-  WRD $CCCC
-  WRD $CF00
  ; ASCII 147 
   WRD $7C82
-  WRD $7CC6
-  WRD $C6C6
-  WRD $7C00
  ; ASCII 148 
   WRD $6600
-  WRD $7CC6
-  WRD $C6C6
-  WRD $7C00
  ; ASCII 149 
   WRD $E000
-  WRD $7CC6
-  WRD $C6C6
-  WRD $7C00
  ; ASCII 150 
   WRD $7C82
-  WRD $00C6
-  WRD $C6C6
-  WRD $7E00
  ; ASCII 151 
   WRD $E000
-  WRD $C6C6
-  WRD $C6C6
-  WRD $7E00
  ; ASCII 152 
   WRD $6600
-  WRD $6666
-  WRD $663E
-  WRD $067C
  ; ASCII 153 
   WRD $C67C
-  WRD $C6C6
-  WRD $C6C6
-  WRD $7C00
  ; ASCII 154 
   WRD $C600
-  WRD $C6C6
-  WRD $C6C6
-  WRD $FE00
  ; ASCII 155 
   WRD $1818
-  WRD $7ED8
-  WRD $D8D8
-  WRD $7E18
  ; ASCII 156 
   WRD $386C
-  WRD $60F0
-  WRD $6066
-  WRD $FC00
  ; ASCII 157 
   WRD $6666
-  WRD $3C18
-  WRD $7E18
-  WRD $7E18
  ; ASCII 158 
   WRD $F8CC
-  WRD $CCFA
-  WRD $C6CF
-  WRD $C6C3
  ; ASCII 159 
   WRD $0E1B
-  WRD $183C
-  WRD $1818
-  WRD $D870
  ; ASCII 160 
   WRD $0E00
-  WRD $7C06
-  WRD $7EC6
-  WRD $7E00
  ; ASCII 161 
   WRD $1C00
-  WRD $3818
-  WRD $1818
-  WRD $3C00
  ; ASCII 162 
   WRD $0E00
-  WRD $7CC6
-  WRD $C6C6
-  WRD $7C00
  ; ASCII 163 
   WRD $0E00
-  WRD $C6C6
-  WRD $C6C6
-  WRD $7E00
  ; ASCII 164 
   WRD $00FE
-  WRD $00FC
-  WRD $C6C6
-  WRD $C600
  ; ASCII 165 
   WRD $FE00
-  WRD $C6E6
-  WRD $F6DE
-  WRD $CE00
  ; ASCII 166 
   WRD $3C6C
-  WRD $6C3E
-  WRD $007E
-  WRD $0000
  ; ASCII 167 
   WRD $3C66
-  WRD $663C
-  WRD $007E
-  WRD $0000
  ; ASCII 168 
   WRD $1800
-  WRD $1818
-  WRD $3066
-  WRD $3C00
  ; ASCII 169 
-  WRD $0000
-  WRD $00FC
-  WRD $C0C0
   WRD $0000
  ; ASCII 170 
   WRD $0000
-  WRD $00FC
-  WRD $0C0C
-  WRD $0000
  ; ASCII 171 
   WRD $C6CC
-  WRD $D83F
-  WRD $63CF
-  WRD $8C0F
  ; ASCII 172 
   WRD $C3C6
-  WRD $CCDB
-  WRD $376D
-  WRD $CF03
  ; ASCII 173 
-  WRD $1800
-  WRD $1818
-  WRD $1818
   WRD $1800
  ; ASCII 174 
   WRD $0033
-  WRD $66CC
-  WRD $6633
-  WRD $0000
  ; ASCII 175 
   WRD $00CC
-  WRD $6633
-  WRD $66CC
-  WRD $0000
  ; ASCII 176 
-  WRD $2288
-  WRD $2288
-  WRD $2288
   WRD $2288
  ; ASCII 177 
   WRD $55AA
-  WRD $55AA
-  WRD $55AA
-  WRD $55AA
  ; ASCII 178 
-  WRD $DD77
-  WRD $DD77
-  WRD $DD77
   WRD $DD77
  ; ASCII 179 
   WRD $1818
-  WRD $1818
-  WRD $1818
-  WRD $1818
  ; ASCII 180 
-  WRD $1818
-  WRD $1818
-  WRD $F818
   WRD $1818
  ; ASCII 181 
   WRD $1818
-  WRD $F818
-  WRD $F818
-  WRD $1818
  ; ASCII 182 
-  WRD $3636
-  WRD $3636
-  WRD $F636
   WRD $3636
  ; ASCII 183 
   WRD $0000
-  WRD $0000
-  WRD $FE36
-  WRD $3636
  ; ASCII 184 
   WRD $0000
-  WRD $F818
-  WRD $F818
-  WRD $1818
  ; ASCII 185 
-  WRD $3636
-  WRD $F606
-  WRD $F636
   WRD $3636
  ; ASCII 186 
   WRD $3636
-  WRD $3636
-  WRD $3636
-  WRD $3636
  ; ASCII 187 
   WRD $0000
-  WRD $FE06
-  WRD $F636
-  WRD $3636
  ; ASCII 188 
   WRD $3636
-  WRD $F606
-  WRD $FE00
-  WRD $0000
  ; ASCII 189 
   WRD $3636
-  WRD $3636
-  WRD $FE00
-  WRD $0000
  ; ASCII 190 
   WRD $1818
-  WRD $F818
-  WRD $F800
-  WRD $0000
  ; ASCII 191 
   WRD $0000
-  WRD $0000
-  WRD $F818
-  WRD $1818
  ; ASCII 192 
   WRD $1818
-  WRD $1818
-  WRD $1F00
-  WRD $0000
  ; ASCII 193 
   WRD $1818
-  WRD $1818
-  WRD $FF00
-  WRD $0000
  ; ASCII 194 
   WRD $0000
-  WRD $0000
-  WRD $FF18
-  WRD $1818
  ; ASCII 195 
-  WRD $1818
-  WRD $1818
-  WRD $1F18
   WRD $1818
  ; ASCII 196 
   WRD $0000
-  WRD $0000
-  WRD $FF00
-  WRD $0000
  ; ASCII 197 
-  WRD $1818
-  WRD $1818
-  WRD $FF18
   WRD $1818
  ; ASCII 198 
   WRD $1818
-  WRD $1F18
-  WRD $1F18
-  WRD $1818
  ; ASCII 199 
-  WRD $3636
-  WRD $3636
-  WRD $3736
   WRD $3636
  ; ASCII 200 
   WRD $3636
-  WRD $3730
-  WRD $3F00
-  WRD $0000
  ; ASCII 201 
   WRD $0000
-  WRD $3F30
-  WRD $3736
-  WRD $3636
  ; ASCII 202 
   WRD $3636
-  WRD $F700
-  WRD $FF00
-  WRD $0000
  ; ASCII 203 
   WRD $0000
-  WRD $FF00
-  WRD $F736
-  WRD $3636
  ; ASCII 204 
-  WRD $3636
-  WRD $3730
-  WRD $3736
   WRD $3636
  ; ASCII 205 
   WRD $0000
-  WRD $FF00
-  WRD $FF00
-  WRD $0000
  ; ASCII 206 
-  WRD $3636
-  WRD $F700
-  WRD $F736
   WRD $3636
  ; ASCII 207 
   WRD $1818
-  WRD $FF00
-  WRD $FF00
-  WRD $0000
  ; ASCII 208 
   WRD $3636
-  WRD $3636
-  WRD $FF00
-  WRD $0000
  ; ASCII 209 
   WRD $0000
-  WRD $FF00
-  WRD $FF18
-  WRD $1818
  ; ASCII 210 
   WRD $0000
-  WRD $0000
-  WRD $FF36
-  WRD $3636
  ; ASCII 211 
   WRD $3636
-  WRD $3636
-  WRD $3F00
-  WRD $0000
  ; ASCII 212 
   WRD $1818
-  WRD $1F18
-  WRD $1F00
-  WRD $0000
  ; ASCII 213 
   WRD $0000
-  WRD $1F18
-  WRD $1F18
-  WRD $1818
  ; ASCII 214 
   WRD $0000
-  WRD $0000
-  WRD $3F36
-  WRD $3636
  ; ASCII 215 
-  WRD $3636
-  WRD $3636
-  WRD $FF36
   WRD $3636
  ; ASCII 216 
   WRD $1818
-  WRD $FF18
-  WRD $FF18
-  WRD $1818
  ; ASCII 217 
   WRD $1818
-  WRD $1818
-  WRD $F800
-  WRD $0000
  ; ASCII 218 
   WRD $0000
-  WRD $0000
-  WRD $1F18
-  WRD $1818
  ; ASCII 219 
-  WRD $FFFF
-  WRD $FFFF
-  WRD $FFFF
   WRD $FFFF
  ; ASCII 220 
   WRD $0000
-  WRD $0000
-  WRD $FFFF
-  WRD $FFFF
  ; ASCII 221 
-  WRD $F0F0
-  WRD $F0F0
-  WRD $F0F0
   WRD $F0F0
  ; ASCII 222 
   WRD $0F0F
-  WRD $0F0F
-  WRD $0F0F
-  WRD $0F0F
  ; ASCII 223 
   WRD $FFFF
-  WRD $FFFF
-  WRD $0000
-  WRD $0000
  ; ASCII 224 
   WRD $0000
-  WRD $76DC
-  WRD $C8DC
-  WRD $7600
  ; ASCII 225 
   WRD $386C
-  WRD $6C78
-  WRD $6C66
-  WRD $6C60
  ; ASCII 226 
   WRD $00FE
-  WRD $C6C0
-  WRD $C0C0
-  WRD $C000
  ; ASCII 227 
   WRD $0000
-  WRD $FE6C
-  WRD $6C6C
-  WRD $6C00
  ; ASCII 228 
   WRD $FE60
-  WRD $3018
-  WRD $3060
-  WRD $FE00
  ; ASCII 229 
   WRD $0000
-  WRD $7ED8
-  WRD $D8D8
-  WRD $7000
  ; ASCII 230 
   WRD $0066
-  WRD $6666
-  WRD $667C
-  WRD $60C0
  ; ASCII 231 
   WRD $0076
-  WRD $DC18
-  WRD $1818
-  WRD $1800
  ; ASCII 232 
   WRD $7E18
-  WRD $3C66
-  WRD $663C
-  WRD $187E
  ; ASCII 233 
   WRD $3C66
-  WRD $C3FF
-  WRD $C366
-  WRD $3C00
  ; ASCII 234 
   WRD $3C66
-  WRD $C3C3
-  WRD $6666
-  WRD $E700
  ; ASCII 235 
   WRD $0E18
-  WRD $0C7E
-  WRD $C6C6
-  WRD $7C00
  ; ASCII 236 
-  WRD $0000
-  WRD $7EDB
-  WRD $DB7E
   WRD $0000
  ; ASCII 237 
   WRD $060C
-  WRD $7EDB
-  WRD $DB7E
-  WRD $60C0
  ; ASCII 238 
   WRD $3860
-  WRD $C0F8
-  WRD $C060
-  WRD $3800
  ; ASCII 239 
   WRD $78CC
-  WRD $CCCC
-  WRD $CCCC
-  WRD $CC00
  ; ASCII 240 
   WRD $007E
-  WRD $007E
-  WRD $007E
-  WRD $0000
  ; ASCII 241 
   WRD $1818
-  WRD $7E18
-  WRD $1800
-  WRD $7E00
  ; ASCII 242 
   WRD $6030
-  WRD $1830
-  WRD $6000
-  WRD $FC00
  ; ASCII 243 
   WRD $1830
-  WRD $6030
-  WRD $1800
-  WRD $FC00
  ; ASCII 244 
   WRD $0E1B
-  WRD $1B18
-  WRD $1818
-  WRD $1818
  ; ASCII 245 
   WRD $1818
-  WRD $1818
-  WRD $18D8
-  WRD $D870
  ; ASCII 246 
   WRD $1818
-  WRD $007E
-  WRD $0018
-  WRD $1800
  ; ASCII 247 
   WRD $0076
-  WRD $DC00
-  WRD $76DC
-  WRD $0000
  ; ASCII 248 
   WRD $386C
-  WRD $6C38
-  WRD $0000
-  WRD $0000
  ; ASCII 249 
-  WRD $0000
-  WRD $0018
-  WRD $1800
   WRD $0000
  ; ASCII 250 
   WRD $0000
-  WRD $0000
-  WRD $1800
-  WRD $0000
  ; ASCII 251 
   WRD $0F0C
-  WRD $0C0C
-  WRD $EC6C
-  WRD $3C1C
  ; ASCII 252 
   WRD $786C
-  WRD $6C6C
-  WRD $6C00
-  WRD $0000
  ; ASCII 253 
   WRD $7C0C
-  WRD $7C60
-  WRD $7C00
-  WRD $0000
  ; ASCII 254 
-  WRD $0000
-  WRD $3C3C
-  WRD $3C3C
   WRD $0000
  ; ASCII 255 
   WRD $0010
-  WRD $0000
-  WRD $0000
-  WRD $0000
   
 ; XPOS	( -- a )
 ;		Storage for cursor X position.
