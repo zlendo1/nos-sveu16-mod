@@ -23,6 +23,8 @@
 #define INTERRUPT_INTERVAL_MS 20
 #define MEM_SIZE 65536
 #define DISK_PATH "disk.img"
+#define SCREEN_WIDTH 900
+#define SCREEN_HEIGHT 500
 
 unsigned short memory[MEM_SIZE]; // Array of 16 bit words simulates 128K memory
 
@@ -55,12 +57,34 @@ HDC hdc;
 
 unsigned short disk_command;
 unsigned short disk_sector;
-unsigned short disk_position;
 FILE *file_handler = NULL;
 
 // CPU initialization
 void reset() {
   regs[15] = 0; // Just set program counter to zero
+}
+
+void draw_line(int pos, unsigned char x_from, unsigned char x_to, unsigned char y_from,
+               unsigned char y_to) {
+  for (int i = x_from; i < x_to; i++) {
+    for (int j = y_from; j < x_to; j++) {
+      *(pBits + pos + SCREEN_WIDTH * i + j) = 1;
+    }
+  }
+}
+
+void draw_diagonal_down(int pos, unsigned char from_y, unsigned char to_y) {
+  for (int i = from_y; i < to_y; i++) {
+    *(pBits + pos + SCREEN_WIDTH * i + i) = 1;
+    *(pBits + pos + SCREEN_WIDTH * i + i + 1) = 1;
+  }
+}
+
+void draw_diagonal_up(int pos, unsigned char from_y, unsigned char to_y) {
+  for (int i = to_y - 1; i <= from_y; i--) {
+    *(pBits + pos + SCREEN_WIDTH * i + i) = 1;
+    *(pBits + pos + SCREEN_WIDTH * i + i + 1) = 1;
+  }
 }
 
 // Main emulation loop analyse and execute cyclecount instructions
@@ -105,25 +129,12 @@ dolod:
     regs[current->dest] = asciikeyboard; // Do special handling
     asciikeyboard = 0;                   // This keyboard controller returns ASCII code of the key!
   } else if (regs[current->src2] == DISK_DATA_PORT) {
-    if (disk_command == 1 && disk_position == 0) {
-      file_handler = fopen(DISK_PATH, "rb");
-    }
-
     if (file_handler == NULL) {
-      MessageBox(NULL, "Disk image not found!", "Error!", MB_ICONEXCLAMATION | MB_OK);
-    } else if (fseek(file_handler, disk_sector * DISK_SECTOR_SIZE + disk_position, SEEK_SET) != 0) {
+      MessageBox(NULL, "File handler not open!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    } else if (fseek(file_handler, sizeof(unsigned short), SEEK_CUR) != 0) {
       MessageBox(NULL, "Error seeking in disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     } else if (fread(regs + current->dest, sizeof(unsigned short), 1, file_handler) != 1) {
       MessageBox(NULL, "Error reading from disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
-    }
-
-    disk_position += sizeof(unsigned short); // Move 2 bytes = 1 word
-
-    if (disk_position == DISK_SECTOR_SIZE) {
-      fclose(file_handler);
-      file_handler = NULL;
-
-      disk_position = 0;
     }
   }
 
@@ -241,60 +252,99 @@ dosto:
     if (regs[current->src2] >= VRAM_START && // Special case for memory belonging to video
         regs[current->src2] < VRAM_END) {
       int pos = (regs[current->src2] - VRAM_START) *
-                16; // 16 pixels per word, convert to relative position in bitmap
+                12; // 12 pixels per word width, convert to relative position in bitmap
       unsigned short val = regs[current->src1];
 
-      // Now for each bit in SRC1 register change corresponding byte in bitmap
-      *(pBits + pos) = (val & 0x8000) ? 1 : 0;
-      *(pBits + pos + 1) = (val & 0x4000) ? 1 : 0;
-      *(pBits + pos + 2) = (val & 0x2000) ? 1 : 0;
-      *(pBits + pos + 3) = (val & 0x1000) ? 1 : 0;
-      *(pBits + pos + 4) = (val & 0x0800) ? 1 : 0;
-      *(pBits + pos + 5) = (val & 0x0400) ? 1 : 0;
-      *(pBits + pos + 6) = (val & 0x0200) ? 1 : 0;
-      *(pBits + pos + 7) = (val & 0x0100) ? 1 : 0;
-      *(pBits + pos + 8) = (val & 0x0080) ? 1 : 0;
-      *(pBits + pos + 9) = (val & 0x0040) ? 1 : 0;
-      *(pBits + pos + 10) = (val & 0x0020) ? 1 : 0;
-      *(pBits + pos + 11) = (val & 0x0010) ? 1 : 0;
-      *(pBits + pos + 12) = (val & 0x0008) ? 1 : 0;
-      *(pBits + pos + 13) = (val & 0x0004) ? 1 : 0;
-      *(pBits + pos + 14) = (val & 0x0002) ? 1 : 0;
-      *(pBits + pos + 15) = (val & 0x0001) ? 1 : 0;
+      /*// Now for each bit in SRC1 register change corresponding byte in bitmap*/
+      /**(pBits + pos) = (val & 0x8000) ? 1 : 0;*/
+      /**(pBits + pos + 1) = (val & 0x4000) ? 1 : 0;*/
+      /**(pBits + pos + 2) = (val & 0x2000) ? 1 : 0;*/
+      /**(pBits + pos + 3) = (val & 0x1000) ? 1 : 0;*/
+      /**(pBits + pos + 4) = (val & 0x0800) ? 1 : 0;*/
+      /**(pBits + pos + 5) = (val & 0x0400) ? 1 : 0;*/
+      /**(pBits + pos + 6) = (val & 0x0200) ? 1 : 0;*/
+      /**(pBits + pos + 7) = (val & 0x0100) ? 1 : 0;*/
+      /**(pBits + pos + 8) = (val & 0x0080) ? 1 : 0;*/
+      /**(pBits + pos + 9) = (val & 0x0040) ? 1 : 0;*/
+      /**(pBits + pos + 10) = (val & 0x0020) ? 1 : 0;*/
+      /**(pBits + pos + 11) = (val & 0x0010) ? 1 : 0;*/
+      /**(pBits + pos + 12) = (val & 0x0008) ? 1 : 0;*/
+      /**(pBits + pos + 13) = (val & 0x0004) ? 1 : 0;*/
+      /**(pBits + pos + 14) = (val & 0x0002) ? 1 : 0;*/
+      /**(pBits + pos + 15) = (val & 0x0001) ? 1 : 0;*/
+
+      if (val & 0x0001)
+        draw_line(pos, 0, 1, 1, 5);
+      if (val & 0x0002)
+        draw_line(pos, 0, 1, 7, 12);
+      if (val & 0x0004)
+        draw_line(pos, 1, 9, 11, 12);
+      if (val & 0x0008)
+        draw_line(pos, 11, 19, 11, 12);
+      if (val & 0x0010)
+        draw_line(pos, 19, 20, 7, 11);
+      if (val & 0x0020)
+        draw_line(pos, 19, 20, 1, 5);
+      if (val & 0x0040)
+        draw_line(pos, 11, 18, 0, 1);
+      if (val & 0x0080)
+        draw_line(pos, 1, 9, 0, 1);
+      if (val & 0x0100)
+        draw_diagonal_down(pos, 1, 5);
+      if (val & 0x0200)
+        draw_line(pos, 1, 9, 5, 7);
+      if (val & 0x0400)
+        draw_diagonal_up(pos, 7, 11);
+      if (val & 0x0800)
+        draw_line(pos, 9, 11, 7, 11);
+      if (val & 0x1000)
+        draw_diagonal_down(pos, 7, 11);
+      if (val & 0x2000)
+        draw_line(pos, 11, 19, 5, 7);
+      if (val & 0x4000)
+        draw_diagonal_up(pos, 1, 5);
+      if (val & 0x8000)
+        draw_line(pos, 9, 11, 1, 5);
 
       videochanged = 1; // Video was changed
     }
   } else if (regs[current->src2] == DISK_COMMAND_PORT) {
     regs[current->dest] = disk_command = regs[current->src1];
 
+    if (file_handler != NULL) {
+      fclose(file_handler);
+    }
+
     if (disk_command == 0) {
       disk_sector = 0;
-      disk_position = 0;
+    } else if (disk_command == 1) {
+      file_handler = fopen(DISK_PATH, "rb");
+
+      if (file_handler == NULL) {
+        MessageBox(NULL, "Error opening disk handle!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+      }
+
+      fseek(file_handler, disk_sector * DISK_SECTOR_SIZE, SEEK_SET);
+    } else if (disk_command == 2) {
+      file_handler = fopen(DISK_PATH, "rb+");
+
+      if (file_handler == NULL) {
+        MessageBox(NULL, "Error opening disk handle!", "Error!", MB_ICONEXCLAMATION | MB_OK);
+      }
+
+      fseek(file_handler, disk_sector * DISK_SECTOR_SIZE, SEEK_SET);
     }
   } else if (regs[current->src2] == DISK_SECTOR_PORT) {
     regs[current->dest] = disk_sector = regs[current->src1];
   } else if (regs[current->src2] == DISK_DATA_PORT) {
-    if (disk_command == 1 && disk_position == 0) {
-      file_handler = fopen(DISK_PATH, "rb+");
-    }
-
     if (file_handler == NULL) {
-      MessageBox(NULL, "Disk image not found!", "Error!", MB_ICONEXCLAMATION | MB_OK);
-    } else if (fseek(file_handler, disk_sector * DISK_SECTOR_SIZE + disk_position, SEEK_SET) != 0) {
+      MessageBox(NULL, "File handler not open", "Error!", MB_ICONEXCLAMATION | MB_OK);
+    } else if (fseek(file_handler, sizeof(unsigned short), SEEK_CUR) != 0) {
       MessageBox(NULL, "Error seeking in disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     } else if (fwrite(regs + current->src1, sizeof(unsigned short), 1, file_handler) != 1) {
       MessageBox(NULL, "Error reading from disk!", "Error!", MB_ICONEXCLAMATION | MB_OK);
     } else {
       regs[current->dest] = regs[current->src1];
-    }
-
-    disk_position += sizeof(unsigned short); // Move 2 bytes = 1 word
-
-    if (disk_position == DISK_SECTOR_SIZE) {
-      fclose(file_handler);
-      file_handler = NULL;
-
-      disk_position = 0;
     }
   } else { // Area of memory that belongs to ROM or unidirectional I/O device
     regs[current->dest] = regs[current->src1]; // Do not update memory, just destination register
@@ -443,13 +493,13 @@ void CreateDIB() {
   hdc = GetDC(hwndMain);
   int i;
   bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-  bi.bmiHeader.biWidth = 900;          // 900 pixels width
-  bi.bmiHeader.biHeight = -500;        // 500 pixels height negative number == top down DIB
-  bi.bmiHeader.biPlanes = 1;           // Number of planes must be set to 1
-  bi.bmiHeader.biBitCount = 8;         // 8 bits per pixel, easiest way to access each pixel
-  bi.bmiHeader.biCompression = BI_RGB; // No compression
-  bi.bmiHeader.biClrUsed = 2;          // Just two colors 0 background, 1 foreground
-  bi.bmiColors[0].rgbRed = 0xE0;       // Defines cream yellow background
+  bi.bmiHeader.biWidth = SCREEN_WIDTH;    // 900 pixels width
+  bi.bmiHeader.biHeight = -SCREEN_HEIGHT; // 500 pixels height negative number == top down DIB
+  bi.bmiHeader.biPlanes = 1;              // Number of planes must be set to 1
+  bi.bmiHeader.biBitCount = 8;            // 8 bits per pixel, easiest way to access each pixel
+  bi.bmiHeader.biCompression = BI_RGB;    // No compression
+  bi.bmiHeader.biClrUsed = 2;             // Just two colors 0 background, 1 foreground
+  bi.bmiColors[0].rgbRed = 0xE0;          // Defines cream yellow background
   bi.bmiColors[0].rgbGreen = 0xDE;
   bi.bmiColors[0].rgbBlue = 0xBC;
   bi.bmiColors[0].rgbReserved = 0;
@@ -487,7 +537,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
     break;
   }
   case WM_KEYDOWN: {                       // Key pressed
-    asciikeyboard = (lparam >> 16) & 0xFF; // Get ASCII code of key
+    asciikeyboard = (lParam >> 16) & 0xFF; // Get ASCII code of key
     break;
   }
   case WM_PAINT: {               // Main window overlapped or changed size

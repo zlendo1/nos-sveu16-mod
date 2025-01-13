@@ -6,7 +6,7 @@ emulgui_i686: emulgui.c
 
 forth:
 	wine asem.exe forth.asm forth.mem
-	./expand_file forth.mem forth.img 16000
+	./expand_file forth.mem disk.img 16000
 
 boot:
 	wine asem.exe boot.asm boot.img
